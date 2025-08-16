@@ -16,8 +16,8 @@ export class ConfigManager {
   private statusConfigPath: string;
 
   constructor() {
-    this.configPath = path.join(__dirname, '../../config/default.json');
-    this.statusConfigPath = path.join(__dirname, '../../config/statuses.json');
+    this.configPath = path.join(__dirname, '../../.claude/clickup/config.json');
+    this.statusConfigPath = path.join(__dirname, '../../.claude/clickup/statuses.json');
     
     this.config = this.loadConfig();
     this.statusConfig = this.loadStatusConfig();
@@ -26,7 +26,7 @@ export class ConfigManager {
   private loadConfig(): ProjectConfig {
     const defaultConfig: ProjectConfig = {
       clickup: {
-        api_key: process.env.CLICKUP_API_KEY || '',
+        workspace_name: process.env.CLICKUP_WORKSPACE_NAME,
         workspace_id: process.env.CLICKUP_WORKSPACE_ID,
         default_space: process.env.CLICKUP_DEFAULT_SPACE || 'Ghost Codes Workspace',
         default_list: process.env.CLICKUP_DEFAULT_LIST || 'Development Tasks',
@@ -129,7 +129,8 @@ export class ConfigManager {
   }
 
   getApiKey(): string {
-    return this.config.clickup.api_key;
+    // API key always comes from environment, never from config file
+    return process.env.CLICKUP_API_KEY || '';
   }
 
   getDefaultSpace(): string | undefined {
@@ -187,7 +188,7 @@ export class ConfigManager {
 
   getTemplatePath(templateType: 'task_creation' | 'subtask_creation' | 'future_tasks' | 'daily_report' | 'weekly_report'): string {
     const templateName = this.config.templates[templateType];
-    return path.join(__dirname, '../../templates', templateName);
+    return path.join(__dirname, '../../.claude/clickup/templates', templateName);
   }
 
   loadTemplate(templateType: 'task_creation' | 'subtask_creation' | 'future_tasks' | 'daily_report' | 'weekly_report'): string {

@@ -112,10 +112,10 @@ program
   .action(async () => {
     try {
       const config = configManager.getConfig();
-      const apiKey = config.clickup.api_key;
+      const apiKey = process.env.CLICKUP_API_KEY;
       
       if (!apiKey) {
-        console.log(chalk.red('Not configured. Run: clickmongrel init'));
+        console.log(chalk.red('CLICKUP_API_KEY not set. Set it in your MCP configuration.'));
         process.exit(1);
       }
 

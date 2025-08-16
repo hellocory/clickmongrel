@@ -196,7 +196,7 @@ export interface ReportConfig {
 
 export interface ProjectConfig {
   clickup: {
-    api_key: string;
+    workspace_name?: string;
     workspace_id?: string;
     default_space?: string;
     default_list?: string;

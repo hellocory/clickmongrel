@@ -247,8 +247,9 @@ async function init() {
     console.log(chalk.green('✓ Configuration saved'));
 
     // Step 11: Create templates folder and files
-    console.log(chalk.yellow('\nCreating templates folder...'));
-    const templatesDir = path.join(__dirname, '../templates');
+    console.log(chalk.yellow('\nCreating .claude/clickup structure...'));
+    const claudeDir = path.join(__dirname, '../.claude/clickup');
+    const templatesDir = path.join(claudeDir, 'templates');
     
     if (!fs.existsSync(templatesDir)) {
       fs.mkdirSync(templatesDir, { recursive: true });
