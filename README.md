@@ -12,9 +12,16 @@ A Model Context Protocol (MCP) server that seamlessly integrates Claude's TodoWr
 
 ## Quick Start
 
-### For Claude AI Users
+### For Claude Users (Simplest)
 
-When a user says "setup clickup for me", run:
+When using Claude with ClickMongrel MCP installed, just say:
+- "Initialize ClickUp with [Your Workspace Name]"
+- "Setup ClickUp for this project"
+- "Connect to my ClickUp workspace"
+
+Claude will automatically use the MCP tools to set everything up.
+
+### Manual Setup
 
 ```bash
 # Install globally
@@ -46,6 +53,41 @@ pnpm run build
 # Run setup
 node dist/cli.js setup-clickup --api-key <YOUR_API_KEY>
 ```
+
+## MCP Integration with Claude
+
+### Adding to Claude Code
+
+```bash
+# Add the MCP server
+claude mcp add clickmongrel \
+  --env CLICKUP_API_KEY=<YOUR_API_KEY> \
+  -- node /path/to/clickmongrel/dist/index.js
+
+# Verify it's running
+claude mcp list
+```
+
+### Available MCP Tools
+
+Once installed, Claude can use these tools:
+
+- `setup` - Quick setup with just workspace name
+- `initialize_clickup` - Full setup with all options
+- `sync_todos` - Sync TodoWrite items
+- `create_goal` - Create project goals
+- `link_commit` - Link commits to tasks
+- `generate_report` - Create status reports
+- `workflow_create_tasks` - Create task hierarchies
+- `workflow_complete_task` - Complete tasks with commits
+
+### Usage Examples in Claude
+
+Simply tell Claude:
+- "Initialize ClickUp with Ghost Codes Workspace"
+- "Sync my todos to ClickUp"
+- "Create a goal for this sprint"
+- "Generate a weekly report"
 
 ## Configuration
 

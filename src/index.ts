@@ -293,17 +293,28 @@ class ClickMongrelServer {
         },
         {
           name: 'initialize_clickup',
-          description: 'Initialize ClickUp integration for the current project',
+          description: 'Initialize ClickUp integration for this project. Use when user says "initialize clickup" or "setup clickup integration"',
           inputSchema: {
             type: 'object',
             properties: {
-              workspace_name: { type: 'string', description: 'Name of ClickUp workspace' },
-              space_name: { type: 'string', description: 'Name of space to create or use' },
+              workspace_name: { type: 'string', description: 'Name of your ClickUp workspace (e.g., "Ghost Codes Workspace")' },
+              space_name: { type: 'string', description: 'Name of space to create or use (default: Project name)' },
               list_name: { type: 'string', description: 'Name of list for tasks (default: Tasks)' },
               enable_commits: { type: 'boolean', description: 'Enable commit tracking (default: true)' },
               enable_goals: { type: 'boolean', description: 'Enable goal tracking (default: true)' }
             },
             required: ['workspace_name']
+          }
+        },
+        {
+          name: 'setup',
+          description: 'Quick setup - Initialize ClickUp for this project with a workspace name',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              workspace: { type: 'string', description: 'Your ClickUp workspace name' }
+            },
+            required: ['workspace']
           }
         }
       ]
@@ -604,6 +615,37 @@ class ClickMongrelServer {
                 content: [{
                   type: 'text',
                   text: `Failed to initialize ClickUp: ${error.message}`
+                }]
+              };
+            }
+          }
+
+          case 'setup': {
+            // Simple setup with just workspace name
+            const workspace = args?.workspace as string;
+            
+            // Call the full initialize with defaults
+            const { execSync } = await import('child_process');
+            const cwd = process.cwd();
+            const projectName = cwd.split('/').pop() || 'Project';
+            
+            try {
+              const result = execSync(
+                `node ${__dirname}/quick-setup.js "${workspace}" "${projectName}" "Tasks" true true`,
+                { cwd, encoding: 'utf-8' }
+              );
+              
+              return {
+                content: [{
+                  type: 'text',
+                  text: `✅ ClickUp integration initialized!\n\nWorkspace: ${workspace}\nSpace: ${projectName}\nList: Tasks\n\n✨ Features enabled:\n- TodoWrite sync\n- Commit tracking\n- Goal tracking\n\n${result}`
+                }]
+              };
+            } catch (error: any) {
+              return {
+                content: [{
+                  type: 'text',
+                  text: `Failed to setup ClickUp: ${error.message}`
                 }]
               };
             }

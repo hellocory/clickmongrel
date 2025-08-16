@@ -227,33 +227,26 @@ run_claude_setup() {
     
     # Create Claude command script
     cat > claude-setup.txt << EOF
-Please perform the following setup tasks:
+Please perform the following test setup:
 
-1. Initialize ClickUp integration using: node dist/cli.js setup-clickup --workspace-name "$CLICKUP_WORKSPACE"
+1. Initialize ClickUp with workspace "$CLICKUP_WORKSPACE"
+   (The MCP tool will handle all the setup automatically)
 
-2. Verify the following configurations are created:
-   - .claude/clickup/config.json exists
-   - config/commit-templates.json exists
-   - All required folders are created
+2. Create a test goal called "ClickMongrel Integration Test Run"
 
-3. Create a test goal called "ClickMongrel Integration Test Run"
-
-4. Create a test todo list:
+3. Create a test todo list:
    - Test parent task
      - Test subtask 1
      - Test subtask 2
    - Test standalone task
 
-5. Sync the todos to ClickUp using the MCP tools
+4. Sync the todos to ClickUp
 
-6. Complete the first subtask and create a commit with message: "test: Validate subtask completion"
+5. Complete the first subtask and create a commit: "test: Validate subtask completion"
 
-7. Generate a status report showing:
-   - Current goal and progress
-   - Tasks in ClickUp
-   - Commits tracked
+6. Generate a status report
 
-Please output "SETUP_COMPLETE" when done.
+Output "SETUP_COMPLETE" when done.
 EOF
     
     # Copy to logs directory
