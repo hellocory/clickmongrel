@@ -8,6 +8,7 @@ export interface ClickUpTask {
   due_date?: string;
   start_date?: string;
   time_estimate?: number;
+  tags?: ClickUpTag[];
   custom_fields?: ClickUpCustomField[];
   list: {
     id: string;
@@ -29,6 +30,13 @@ export interface ClickUpStatus {
   color: string;
   orderindex: number;
   type: string;
+}
+
+export interface ClickUpTag {
+  name: string;
+  tag_fg: string;
+  tag_bg: string;
+  creator?: number;
 }
 
 export interface ClickUpUser {

@@ -5,24 +5,48 @@
         "Development Tasks": {
           "statuses": [
             {
-              "id": "p90139254308_fsAwOp41",
+              "id": "sc901317936119_h0Df0AbD",
               "status": "to do",
               "orderindex": 0,
               "color": "#87909e",
               "type": "open",
-              "status_group": "proj_90139254308"
+              "status_group": "subcat_901317936119"
             },
             {
-              "id": "p90139254308_86p8fXp6",
-              "status": "complete",
+              "id": "sc901317936119_p3my7ajs",
+              "status": "future",
               "orderindex": 1,
+              "color": "#f8ae00",
+              "type": "unstarted",
+              "status_group": "subcat_901317936119"
+            },
+            {
+              "id": "sc901317936119_F5fUsM3u",
+              "status": "in progress",
+              "orderindex": 2,
+              "color": "#1090e0",
+              "type": "custom",
+              "status_group": "subcat_901317936119"
+            },
+            {
+              "id": "sc901317936119_Ouf2tNKQ",
+              "status": "fixing",
+              "orderindex": 3,
+              "color": "#b660e0",
+              "type": "custom",
+              "status_group": "subcat_901317936119"
+            },
+            {
+              "id": "sc901317936119_q5cLyCiT",
+              "status": "completed",
+              "orderindex": 4,
               "color": "#008844",
               "type": "closed",
-              "status_group": "proj_90139254308"
+              "status_group": "subcat_901317936119"
             }
           ],
           "default_status": "to do",
-          "complete_status": "complete"
+          "complete_status": "completed"
         }
       }
     }
@@ -30,6 +54,6 @@
   "status_mappings": {
     "pending": "to do",
     "in_progress": "in progress",
-    "completed": "complete"
+    "completed": "completed"
   }
 }

@@ -287,9 +287,20 @@ export class SyncHandler {
       status: { status } as any
     };
 
-    // Add time estimate if available
+    // Add time estimate if available (in milliseconds)
     if (todo.estimated_time) {
       taskData.time_estimate = todo.estimated_time;
+    }
+
+    // Add tags if available
+    if (todo.tags && todo.tags.length > 0) {
+      taskData.tags = todo.tags;
+    }
+
+    // Add priority as number (ClickUp format: 1=Urgent, 2=High, 3=Normal, 4=Low)
+    if (todo.priority) {
+      const priorityMap = { urgent: 1, high: 2, normal: 3, low: 4 };
+      taskData.priority = priorityMap[todo.priority] || 3;
     }
 
     // Add due date based on priority

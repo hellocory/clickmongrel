@@ -125,7 +125,8 @@ export class ClickUpAPI {
     const response = await this.client.get(`/list/${listId}/task`, {
       params: {
         include_subtasks: includeSubtasks,
-        include_closed: false
+        include_closed: false,
+        include_tags: true
       }
     });
     const tasks = response.data.tasks;
@@ -137,7 +138,7 @@ export class ClickUpAPI {
     const cached = cache.getTask(taskId);
     if (cached) return cached;
 
-    const response = await this.client.get(`/task/${taskId}`);
+    const response = await this.client.get(`/task/${taskId}?include_tags=true`);
     const task = response.data;
     cache.setTask(task);
     return task;
@@ -148,11 +149,12 @@ export class ClickUpAPI {
       name: task.name,
       description: task.description,
       status: task.status?.status,
-      priority: task.priority?.id,
+      priority: task.priority?.id || task.priority,
       due_date: task.due_date,
       start_date: task.start_date,
       time_estimate: task.time_estimate,
       assignees: task.assignees?.map(a => a.id),
+      tags: task.tags, // Added tags!
       custom_fields: task.custom_fields
     });
     
