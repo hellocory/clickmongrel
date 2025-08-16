@@ -364,9 +364,14 @@ export class SyncHandler {
       if (parentClickUpId) {
         taskData.parent = parentClickUpId;
         logger.info(`Setting parent task ${parentClickUpId} for subtask ${todo.content} using cached mapping`);
+        
+        // If subtask is starting as in_progress, update parent too
+        if (todo.status === 'in_progress') {
+          await this.setParentTaskInProgress(parentClickUpId);
+        }
       } else {
         // Fallback: Get existing tasks to find the parent
-        const existingTasks = await this.api.getTasks(this.listId!);
+        const existingTasks = await this.api.getTasks(this.listId!, true); // Include subtasks
         
         // Look for a task whose name matches the parent todo's content
         // We need to find the parent todo first
@@ -382,6 +387,11 @@ export class SyncHandler {
           taskData.parent = parentTask.id;
           this.taskIdMap.set(todo.parent_id, parentTask.id); // Cache for future use
           logger.info(`Setting parent task ${parentTask.id} for subtask ${todo.content}`);
+          
+          // If subtask is starting as in_progress, update parent too
+          if (todo.status === 'in_progress') {
+            await this.setParentTaskInProgress(parentTask.id);
+          }
         } else {
           logger.warn(`Could not find parent task for ${todo.content} with parent_id ${todo.parent_id}`);
         }
@@ -469,9 +479,15 @@ export class SyncHandler {
       await this.api.updateTaskStatus(task.id, newStatus);
       logger.info(`Updated task ${task.id} status from ${currentStatus} to ${newStatus}`);
       
-      // If this task was completed and has a parent, check if we need to complete the parent
-      if (todo.status === 'completed' && task.parent) {
-        await this.checkAndCompleteParentTask(task.parent);
+      // Handle parent task status based on subtask status
+      if (task.parent) {
+        if (todo.status === 'in_progress') {
+          // When a subtask starts, set parent to in_progress too
+          await this.setParentTaskInProgress(task.parent);
+        } else if (todo.status === 'completed') {
+          // When a subtask completes, check if all siblings are done
+          await this.checkAndCompleteParentTask(task.parent);
+        }
       }
     }
 
@@ -486,22 +502,68 @@ export class SyncHandler {
       const parentTask = await this.api.getTask(parentTaskId);
       
       // Get all subtasks of this parent
-      const allTasks = await this.api.getTasks(this.listId!);
+      const allTasks = await this.api.getTasks(this.listId!, true); // Include subtasks
       const subtasks = allTasks.filter(t => t.parent === parentTaskId);
       
+      if (subtasks.length === 0) {
+        logger.debug(`No subtasks found for parent task ${parentTaskId}`);
+        return;
+      }
+      
       // Check if all subtasks are completed
+      const completedStatuses = ['completed', 'done', 'complete', 'closed'];
       const allSubtasksCompleted = subtasks.every(t => 
-        t.status.status.toLowerCase() === 'completed'
+        completedStatuses.includes(t.status.status.toLowerCase())
       );
       
-      if (allSubtasksCompleted && parentTask.status.status.toLowerCase() !== 'completed') {
+      const parentCompleted = completedStatuses.includes(parentTask.status.status.toLowerCase());
+      
+      if (allSubtasksCompleted && !parentCompleted) {
         // Complete the parent task
-        await this.api.updateTaskStatus(parentTaskId, 'completed');
+        const completedStatus = configManager.getStatusMapping('completed');
+        await this.api.updateTaskStatus(parentTaskId, completedStatus);
         
-        logger.info(`✅ Auto-completed parent task ${parentTaskId} (${parentTask.name}) - all subtasks done!`);
+        logger.info(`✅ Auto-completed parent task ${parentTaskId} (${parentTask.name}) - all ${subtasks.length} subtasks done!`);
+      } else if (!allSubtasksCompleted && !parentCompleted) {
+        // Check if any subtask is in progress
+        const inProgressStatuses = ['in progress', 'fixing', 'in_progress'];
+        const hasActiveSubtask = subtasks.some(t => 
+          inProgressStatuses.includes(t.status.status.toLowerCase())
+        );
+        
+        if (hasActiveSubtask) {
+          const parentInProgress = inProgressStatuses.includes(parentTask.status.status.toLowerCase());
+          if (!parentInProgress) {
+            const inProgressStatus = configManager.getStatusMapping('in_progress');
+            await this.api.updateTaskStatus(parentTaskId, inProgressStatus);
+            logger.info(`⏳ Parent task ${parentTaskId} (${parentTask.name}) set to in progress - has active subtasks`);
+          }
+        }
       }
     } catch (error) {
       logger.error(`Failed to check/complete parent task ${parentTaskId}:`, error);
+    }
+  }
+
+  private async setParentTaskInProgress(parentTaskId: string): Promise<void> {
+    try {
+      const parentTask = await this.api.getTask(parentTaskId);
+      
+      // Only update if parent is not already in progress or completed
+      const inProgressStatuses = ['in progress', 'fixing', 'in_progress'];
+      const completedStatuses = ['completed', 'done', 'complete', 'closed'];
+      
+      const parentStatus = parentTask.status.status.toLowerCase();
+      const isInProgress = inProgressStatuses.includes(parentStatus);
+      const isCompleted = completedStatuses.includes(parentStatus);
+      
+      if (!isInProgress && !isCompleted) {
+        const inProgressStatus = configManager.getStatusMapping('in_progress');
+        await this.api.updateTaskStatus(parentTaskId, inProgressStatus);
+        logger.info(`⏳ Parent task ${parentTaskId} (${parentTask.name}) set to in progress - subtask started`);
+      }
+    } catch (error) {
+      logger.error(`Failed to set parent task ${parentTaskId} to in progress:`, error);
     }
   }
 
