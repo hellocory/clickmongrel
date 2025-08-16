@@ -237,8 +237,9 @@ export class QuickSetup {
         );
         console.log(chalk.green(`  ✓ Created folder: ${folder.name}`));
       } catch (error: any) {
-        if (error.message?.includes('taken') || error.message?.includes('exists')) {
-          console.log(chalk.gray(`  • Folder exists: ${folder.name}`));
+        // Check if it's just a "folder already exists" error
+        if (error.message?.includes('taken') || error.message?.includes('exists') || error.message?.includes('CAT_014')) {
+          console.log(chalk.gray(`  • Folder exists: ${folder.name} (using existing)`));
         } else {
           console.log(chalk.yellow(`  ⚠ Could not create folder: ${folder.name}`));
         }

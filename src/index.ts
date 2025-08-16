@@ -184,6 +184,14 @@ class ClickMongrelServer {
           }
         },
         {
+          name: 'validate_statuses',
+          description: 'Validate that ClickUp custom statuses are properly configured. Use when user asks to "validate statuses" or "check statuses"',
+          inputSchema: {
+            type: 'object',
+            properties: {}
+          }
+        },
+        {
           name: 'force_sync',
           description: 'Force immediate synchronization',
           inputSchema: {
@@ -496,6 +504,67 @@ class ClickMongrelServer {
               }]
             };
           }
+          case 'validate_statuses': {
+            try {
+              // Import the status validator
+              const { StatusValidator } = await import('./utils/status-validator.js');
+              const validator = new StatusValidator(API_KEY);
+              
+              // Get configured lists
+              const config = configManager.getConfig();
+              const results: string[] = [];
+              
+              results.push('🔍 Validating ClickUp Custom Statuses...\n');
+              
+              // Check Tasks list statuses
+              const tasksListId = (config.clickup as any)?.lists?.tasks;
+              if (tasksListId) {
+                try {
+                  await validator.validateListStatuses(tasksListId, 'tasks');
+                  results.push('✅ Tasks List: All required statuses configured correctly');
+                } catch (error: any) {
+                  results.push('❌ Tasks List: ' + error.message);
+                }
+              } else {
+                results.push('⚠️ Tasks List: Not configured');
+              }
+              
+              // Check Commits list statuses  
+              const commitsListId = (config.clickup as any)?.lists?.commits;
+              if (commitsListId) {
+                try {
+                  await validator.validateListStatuses(commitsListId, 'commits');
+                  results.push('✅ Commits List: All required statuses configured correctly');
+                } catch (error: any) {
+                  results.push('❌ Commits List: ' + error.message);
+                }
+              } else {
+                results.push('⚠️ Commits List: Not configured');
+              }
+              
+              // Overall status
+              const allValid = !results.some(r => r.includes('❌'));
+              if (allValid) {
+                results.push('\n🎉 All statuses are properly configured! The integration is ready to use.');
+              } else {
+                results.push('\n⚠️ Some statuses need to be configured. Check the STATUS_SETUP_GUIDE.md for instructions.');
+              }
+              
+              return {
+                content: [{
+                  type: 'text',
+                  text: results.join('\n')
+                }]
+              };
+            } catch (error: any) {
+              return {
+                content: [{
+                  type: 'text',
+                  text: `❌ Error validating statuses: ${error.message}\n\nMake sure ClickUp is accessible and you have the correct API key.`
+                }]
+              };
+            }
+          }
 
           case 'force_sync': {
             await this.syncHandler.forceSync();
@@ -648,7 +717,7 @@ class ClickMongrelServer {
               return {
                 content: [{
                   type: 'text',
-                  text: `✅ ClickUp integration initialized!\n\nWorkspace: ${displayWorkspace}\nSpace: ${projectName}\nList: Tasks\n\n✨ Features enabled:\n- TodoWrite sync\n- Commit tracking\n- Goal tracking\n\n${result}`
+                  text: `✅ ClickUp integration setup complete!\n\nWorkspace: ${displayWorkspace}\nSpace: ${projectName}\nLists: Tasks & Commits\n\n✨ Features ready:\n- TodoWrite sync\n- Commit tracking\n- Goal tracking\n\n⚠️ **IMPORTANT**: Your integration is set up, but you need to configure custom statuses in ClickUp before it will work.\n\n📋 **Next Steps**:\n1. Check the STATUS_SETUP_GUIDE.md file in .claude/clickup/\n2. Configure the custom statuses in ClickUp\n3. Ask me to "validate clickup statuses" to verify everything is working\n\nOnce statuses are configured, the integration will work as expected!\n\n${result}`
                 }]
               };
             } catch (error: any) {
