@@ -13,14 +13,14 @@ export class CommitHandler {
   private goalHandler: GoalHandler;
   private commitsListId: string | null = null;
   
-  // Status lifecycle mapping
+  // Status lifecycle mapping - MUST match ClickUp statuses exactly (lowercase)
   private statusLifecycle = {
-    COMMITTED: { order: 1, branch: ['local'] },
-    DEVELOPING: { order: 2, branch: ['feature/', 'dev', 'develop'] },
-    PROTOTYPING: { order: 3, branch: ['staging', 'test', 'qa'] },
-    REJECTED: { order: 4, branch: ['hotfix/', 'revert-'] },
-    'PRODUCTION/TESTING': { order: 5, branch: ['canary', 'prod-test'] },
-    'PRODUCTION/FINAL': { order: 6, branch: ['main', 'master', 'production'] }
+    'comitted': { order: 1, branch: ['local'] },
+    'developing': { order: 2, branch: ['feature/', 'dev', 'develop'] },
+    'prototyping': { order: 3, branch: ['staging', 'test', 'qa'] },
+    'rejected': { order: 4, branch: ['hotfix/', 'revert-'] },
+    'production/testing': { order: 5, branch: ['canary', 'prod-test'] },
+    'production/final': { order: 6, branch: ['main', 'master', 'production'] }
   };
 
   constructor(apiKey: string) {
@@ -142,16 +142,16 @@ export class CommitHandler {
       
       switch (event) {
         case 'push':
-          newStatus = 'DEVELOPING';
+          newStatus = 'developing';
           break;
         case 'merge':
           newStatus = this.getStatusForBranch(data?.targetBranch || 'unknown');
           break;
         case 'revert':
-          newStatus = 'REJECTED';
+          newStatus = 'rejected';
           break;
         case 'deploy':
-          newStatus = data?.environment === 'production' ? 'PRODUCTION/TESTING' : 'PROTOTYPING';
+          newStatus = data?.environment === 'production' ? 'production/testing' : 'prototyping';
           break;
         default:
           return;
@@ -182,7 +182,7 @@ export class CommitHandler {
         }
       }
     }
-    return 'COMMITTED';
+    return 'comitted'; // Note: ClickUp has typo in their status name
   }
   
   private parseCommitMessage(message: string): { type: string; description: string } {
