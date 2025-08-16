@@ -12,6 +12,11 @@ test-*.js
 init-*.js
 setup-*.js
 
+# Configuration files (user-specific)
+config/default.json
+config/statuses.json
+config/*.json
+
 # API keys and sensitive data
 **/config.json
 **/mcp-env.json

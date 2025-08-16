@@ -29,33 +29,34 @@ export class SyncHandler {
       }
       
       // Get default list ID
+      const workspaceId = configManager.getConfig().clickup.workspace_id;
       const defaultSpace = configManager.getDefaultSpace();
       const defaultList = configManager.getDefaultList();
       
-      if (defaultSpace && defaultList) {
-        // Get the workspace/team ID first
-        const teams = await this.api.getTeams();
-        const team = teams.find(t => t.name.includes('Ghost Codes')) || teams[0];
+      if (workspaceId && defaultSpace && defaultList) {
+        // Use the configured workspace ID directly
+        const spaces = await this.api.getSpaces(workspaceId);
+        const space = spaces.find(s => s.name === defaultSpace);
         
-        if (team) {
-          // Get spaces
-          const spaces = await this.api.getSpaces(team.id);
-          const space = spaces.find(s => s.name === defaultSpace) || spaces[0];
+        if (space) {
+          // Get lists
+          const lists = await this.api.getLists(space.id);
+          const list = lists.find(l => l.name === defaultList);
           
-          if (space) {
-            // Get lists
-            const lists = await this.api.getLists(space.id);
-            const list = lists.find(l => l.name === defaultList) || lists[0];
+          if (list) {
+            this.listId = list.id;
+            logger.info(`Initialized with list: ${list.name} (${list.id})`);
             
-            if (list) {
-              this.listId = list.id;
-              logger.info(`Initialized with list: ${list.name} (${list.id})`);
-              
-              // Cache the statuses for this list
-              await this.cacheListStatuses(list.id);
-            }
+            // Cache the statuses for this list
+            await this.cacheListStatuses(list.id);
+          } else {
+            logger.error(`List "${defaultList}" not found in space "${defaultSpace}"`);
           }
+        } else {
+          logger.error(`Space "${defaultSpace}" not found in workspace`);
         }
+      } else {
+        logger.warn('Missing workspace configuration - run initialization first');
       }
     } catch (error) {
       logger.error('Failed to initialize sync handler:', error);
