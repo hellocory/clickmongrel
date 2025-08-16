@@ -26,13 +26,21 @@ TEST_DIR="$BASE_DIR/test-runs/$TEST_RUN_ID"
 TEST_REPO_NAME="clickmongrel-test-$TEST_RUN_ID"
 TEST_PROJECT="$TEST_DIR/clickmongrel-test"
 
-# Logging
-LOG_FILE="$TEST_DIR/test.log"
+# Logging directories
+LOGS_DIR="$SOURCE_REPO/test/logs/$TEST_RUN_ID"
 RESULTS_DIR="$TEST_DIR/results"
+
+# Log files
+LOG_FILE="$LOGS_DIR/test.log"
+FULL_OUTPUT="$LOGS_DIR/full-output.log"
+BUILD_LOG="$LOGS_DIR/build.log"
+MCP_LOG="$LOGS_DIR/mcp-setup.log"
+GITHUB_LOG="$LOGS_DIR/github.log"
+CLAUDE_LOG="$LOGS_DIR/claude-commands.log"
 
 # Functions
 log() {
-    echo -e "${2:-$NC}$1${NC}"
+    echo -e "${2:-$NC}$1${NC}" | tee -a "$FULL_OUTPUT"
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$LOG_FILE"
 }
 
@@ -111,10 +119,18 @@ check_prerequisites() {
 setup_test_environment() {
     header "Setting Up Test Environment"
     
-    # Create test directory
+    # Create directories
     log "Creating test directory: $TEST_DIR"
     mkdir -p "$TEST_DIR"
     mkdir -p "$RESULTS_DIR"
+    mkdir -p "$LOGS_DIR"
+    
+    # Initialize output files
+    echo "=== ClickMongrel Test Run: $TEST_RUN_ID ===" > "$FULL_OUTPUT"
+    echo "Started: $(date)" >> "$FULL_OUTPUT"
+    echo "Test Directory: $TEST_DIR" >> "$FULL_OUTPUT"
+    echo "Logs Directory: $LOGS_DIR" >> "$FULL_OUTPUT"
+    echo "" >> "$FULL_OUTPUT"
     
     # Copy source to test location
     log "Copying source repository..."
@@ -126,10 +142,12 @@ setup_test_environment() {
     
     # Install and build
     log "Installing dependencies..."
-    pnpm install >> "$LOG_FILE" 2>&1
+    echo "=== PNPM Install Output ===" >> "$FULL_OUTPUT"
+    pnpm install 2>&1 | tee "$BUILD_LOG" | tee -a "$FULL_OUTPUT" >> "$LOG_FILE"
     
     log "Building project..."
-    pnpm run build >> "$LOG_FILE" 2>&1
+    echo "=== Build Output ===" >> "$FULL_OUTPUT"
+    pnpm run build 2>&1 | tee -a "$BUILD_LOG" | tee -a "$FULL_OUTPUT" >> "$LOG_FILE"
     
     success "Test environment ready"
 }
@@ -147,7 +165,9 @@ create_github_repo() {
     
     # Create repository
     log "Creating repository: $GITHUB_USER/$TEST_REPO_NAME"
-    if gh repo create "$GITHUB_USER/$TEST_REPO_NAME" --public --clone=false >> "$LOG_FILE" 2>&1; then
+    echo "=== GitHub Repo Creation ===" >> "$FULL_OUTPUT"
+    echo "=== GitHub Operations Log ===" > "$GITHUB_LOG"
+    if gh repo create "$GITHUB_USER/$TEST_REPO_NAME" --public --clone=false 2>&1 | tee "$GITHUB_LOG" | tee -a "$FULL_OUTPUT" >> "$LOG_FILE"; then
         success "Repository created"
     else
         warning "Repository creation failed (may already exist)"
@@ -155,13 +175,14 @@ create_github_repo() {
     
     # Initialize git
     rm -rf .git
-    git init >> "$LOG_FILE" 2>&1
+    echo "=== Git Initialization ===" >> "$FULL_OUTPUT"
+    git init 2>&1 | tee -a "$GITHUB_LOG" | tee -a "$FULL_OUTPUT" >> "$LOG_FILE"
     git remote add origin "https://github.com/$GITHUB_USER/$TEST_REPO_NAME.git"
     git add .
-    git commit -m "Initial test setup for $TEST_RUN_ID" >> "$LOG_FILE" 2>&1
+    git commit -m "Initial test setup for $TEST_RUN_ID" 2>&1 | tee -a "$GITHUB_LOG" | tee -a "$FULL_OUTPUT" >> "$LOG_FILE"
     
     # Try to push (may fail if repo doesn't exist)
-    if git push -u origin main --force >> "$LOG_FILE" 2>&1; then
+    if git push -u origin main --force 2>&1 | tee -a "$GITHUB_LOG" | tee -a "$FULL_OUTPUT" >> "$LOG_FILE"; then
         success "Repository initialized"
     else
         warning "Could not push to repository"
@@ -172,18 +193,23 @@ setup_mcp() {
     header "Setting Up MCP Integration"
     
     log "Adding ClickMongrel to Claude Code..."
+    echo "=== MCP Setup Log ===" > "$MCP_LOG"
     
     # Remove if exists
-    claude mcp remove clickmongrel 2>/dev/null || true
+    claude mcp remove clickmongrel 2>&1 | tee -a "$MCP_LOG" >> "$LOG_FILE" || true
     
     # Add MCP with environment variables
+    echo "Adding MCP server..." >> "$MCP_LOG"
     claude mcp add clickmongrel \
         --env "CLICKUP_API_KEY=$CLICKUP_API_KEY" \
         --env "CLICKUP_WORKSPACE=$CLICKUP_WORKSPACE" \
         --env "CLICKUP_SPACE=$CLICKUP_SPACE" \
-        -- node "$TEST_PROJECT/dist/index.js" >> "$LOG_FILE" 2>&1
+        -- node "$TEST_PROJECT/dist/index.js" 2>&1 | tee -a "$MCP_LOG" | tee -a "$FULL_OUTPUT" >> "$LOG_FILE"
     
     # Verify
+    echo "Verifying MCP installation..." >> "$MCP_LOG"
+    claude mcp list 2>&1 | tee -a "$MCP_LOG" >> "$LOG_FILE"
+    
     if claude mcp list | grep -q clickmongrel; then
         success "MCP integration added"
     else
@@ -196,6 +222,8 @@ run_claude_setup() {
     header "Running Claude Setup Commands"
     
     cd "$TEST_PROJECT"
+    
+    echo "=== Claude Commands Log ===" > "$CLAUDE_LOG"
     
     # Create Claude command script
     cat > claude-setup.txt << EOF
@@ -228,7 +256,11 @@ Please perform the following setup tasks:
 Please output "SETUP_COMPLETE" when done.
 EOF
     
+    # Copy to logs directory
+    cp claude-setup.txt "$CLAUDE_LOG"
+    
     log "Claude setup script created at: claude-setup.txt"
+    log "Copy saved to: $CLAUDE_LOG"
     warning "Please run Claude Code and execute the commands in claude-setup.txt"
     
     # Open Claude in test directory
@@ -299,6 +331,10 @@ collect_results() {
     # MCP status
     claude mcp list > "$RESULTS_DIR/mcp-status.txt" 2>/dev/null || true
     claude mcp logs clickmongrel --tail 100 > "$RESULTS_DIR/mcp-logs.txt" 2>/dev/null || true
+    
+    # Copy all logs to results
+    echo "Copying logs to results..." >> "$FULL_OUTPUT"
+    cp -r "$LOGS_DIR" "$RESULTS_DIR/logs" 2>/dev/null || true
     
     # Create summary
     cat > "$RESULTS_DIR/summary.txt" << EOF
@@ -431,7 +467,15 @@ main() {
     echo ""
     success "Test harness complete!"
     log "Results saved to: $RESULTS_DIR"
-    log "Full log: $LOG_FILE"
+    log "Logs saved to: $LOGS_DIR"
+    log "Full output: $FULL_OUTPUT"
+    echo ""
+    echo "Log files created:"
+    echo "  - Full output: $FULL_OUTPUT"
+    echo "  - Build log: $BUILD_LOG"
+    echo "  - GitHub log: $GITHUB_LOG"
+    echo "  - MCP setup: $MCP_LOG"
+    echo "  - Claude commands: $CLAUDE_LOG"
 }
 
 # Handle interrupts

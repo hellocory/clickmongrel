@@ -7,6 +7,7 @@ dist/
 CLAUDE.md
 # Test runs but not test scripts
 test-runs/
+test/logs/
 *.test.js
 *-test.js
 init-*.js
