@@ -11,6 +11,9 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: ^0.6.0
         version: 0.6.1
+      '@types/form-data':
+        specifier: ^2.5.2
+        version: 2.5.2
       axios:
         specifier: ^1.7.2
         version: 1.11.0
@@ -23,6 +26,9 @@ importers:
       dotenv:
         specifier: ^16.4.5
         version: 16.6.1
+      form-data:
+        specifier: ^4.0.4
+        version: 4.0.4
       inquirer:
         specifier: ^9.2.23
         version: 9.3.7
@@ -526,6 +532,10 @@ packages:
 
   '@types/estree@1.0.8':
     resolution: {integrity: sha512-dWHzHa2WqEXI/O1E9OjrocMTKJl2mSrEolh1Iomrv6U+JuNwaHXsXx9bLu5gG7BUWFIN0skIQJQ/L1rIex4X6w==}
+
+  '@types/form-data@2.5.2':
+    resolution: {integrity: sha512-tfmcyHn1Pp9YHAO5r40+UuZUPAZbUEgqTel3EuEKpmF9hPkXgR4l41853raliXnb4gwyPNoQOfvgGGlHN5WSog==}
+    deprecated: This is a stub types definition. form-data provides its own type definitions, so you do not need this installed.
 
   '@types/inquirer@9.0.9':
     resolution: {integrity: sha512-/mWx5136gts2Z2e5izdoRCo46lPp5TMs9R15GTSsgg/XnZyxDWVqoVU3R9lWnccKpqwsJLvRoxbCjoJtZB7DSw==}
@@ -1948,6 +1958,10 @@ snapshots:
   '@sinclair/typebox@0.27.8': {}
 
   '@types/estree@1.0.8': {}
+
+  '@types/form-data@2.5.2':
+    dependencies:
+      form-data: 4.0.4
 
   '@types/inquirer@9.0.9':
     dependencies:

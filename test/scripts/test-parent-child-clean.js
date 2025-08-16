@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-import { SyncHandler } from '../dist/handlers/sync.js';
-import ClickUpAPI from '../dist/utils/clickup-api.js';
+import { SyncHandler } from '../../dist/handlers/sync.js';
+import ClickUpAPI from '../../dist/utils/clickup-api.js';
 import chalk from 'chalk';
 
 const API_KEY = 'pk_138190514_O3WELFAWWV5OHNYNZBZVVLRH2D5FO4RK';

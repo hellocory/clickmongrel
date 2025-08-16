@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-import { SyncHandler } from '../dist/handlers/sync.js';
-import ClickUpAPI from '../dist/utils/clickup-api.js';
+import { SyncHandler } from '../../dist/handlers/sync.js';
+import ClickUpAPI from '../../dist/utils/clickup-api.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';

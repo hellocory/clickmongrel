@@ -29,12 +29,13 @@ export class QuickSetup {
     };
   };
 
-  constructor(apiKey: string, workspaceName?: string, spaceId?: string, folderId?: string) {
+  constructor(apiKey: string, workspaceName?: string, spaceName?: string, spaceId?: string, folderId?: string) {
     this.api = new ClickUpAPI(apiKey);
     this.resolver = new WorkspaceResolver(apiKey);
     this.config = {
       apiKey,
       workspaceName,
+      spaceName,
       spaceId,
       folderId
     };
@@ -95,30 +96,40 @@ export class QuickSetup {
         // this.config.workspaceName = workspace.name;  // DON'T override
         console.log(chalk.gray(`  Workspace: ${this.config.workspaceName}`));
       } else {
-        console.log(chalk.yellow(`  Could not find workspace "${this.config.workspaceName}", will use first available`));
+        // Workspace not found - show error and available workspaces
+        const teams = await this.api.getTeams();
+        console.error(chalk.red(`\n❌ ERROR: Workspace "${this.config.workspaceName}" not found`));
+        console.error(chalk.yellow('Available workspaces:'));
+        teams.forEach(t => console.error(`  - ${t.name} (ID: ${t.id})`));
+        throw new Error(`Workspace "${this.config.workspaceName}" not found. Please use one of the available workspaces.`);
       }
-    }
-    
-    // Fall back to first workspace if not found
-    if (!this.config.workspaceId) {
+    } else {
+      // No workspace specified - if only one exists, use it, otherwise error
       const teams = await this.api.getTeams();
-      if (teams.length > 0) {
+      if (teams.length === 1) {
         this.config.workspaceId = teams[0]?.id;
-        // If no workspace name was provided, use the API's name
-        if (!this.config.workspaceName) {
-          this.config.workspaceName = teams[0]?.name;
-        }
-        console.log(chalk.gray(`  Workspace: ${this.config.workspaceName}`));
+        this.config.workspaceName = teams[0]?.name;
+        console.log(chalk.gray(`  Workspace: ${this.config.workspaceName} (only workspace)`));
+      } else if (teams.length > 1) {
+        console.error(chalk.yellow('\n⚠️  Multiple workspaces found. Please specify which to use:'));
+        teams.forEach(t => console.error(`  - ${t.name} (ID: ${t.id})`));
+        throw new Error('Multiple workspaces found - please specify which workspace to use');
+      } else {
+        throw new Error('No workspaces found in ClickUp account');
       }
     }
   }
 
   /**
-   * Setup the space - use existing or create "Agentic Development"
+   * Setup the space - use provided name, existing ID, or create default
    */
   private async setupSpace(): Promise<void> {
+    if (!this.config.workspaceId) {
+      throw new Error('No workspace found');
+    }
+
+    // If space ID provided, validate it
     if (this.config.spaceId) {
-      // User provided a space ID, just validate it
       console.log(chalk.yellow(`\nValidating space ID: ${this.config.spaceId}`));
       try {
         const space = await this.api.getSpace(this.config.spaceId);
@@ -126,17 +137,47 @@ export class QuickSetup {
         console.log(chalk.green(`✓ Using space: ${space.name}`));
         return;
       } catch (error) {
-        console.log(chalk.yellow('Space ID not found, will create Agentic Development space'));
+        console.log(chalk.yellow('Space ID not found, will continue with space name or default'));
       }
     }
 
-    // No space ID or invalid - create/find Agentic Development
-    console.log(chalk.yellow('\nSetting up Agentic Development space...'));
-    
-    if (!this.config.workspaceId) {
-      throw new Error('No workspace found');
+    // If space name provided, find or create it
+    if (this.config.spaceName) {
+      console.log(chalk.yellow(`\nSetting up space: ${this.config.spaceName}...`));
+      
+      const spaces = await this.api.getSpaces(this.config.workspaceId);
+      
+      // Try exact match first
+      let targetSpace = spaces.find(s => 
+        s.name.toLowerCase() === this.config.spaceName?.toLowerCase()
+      );
+      
+      // Try partial match
+      if (!targetSpace) {
+        targetSpace = spaces.find(s => 
+          s.name.toLowerCase().includes(this.config.spaceName?.toLowerCase() || '') ||
+          (this.config.spaceName?.toLowerCase() || '').includes(s.name.toLowerCase())
+        );
+      }
+      
+      if (targetSpace) {
+        this.config.spaceId = targetSpace.id;
+        this.config.spaceName = targetSpace.name;
+        console.log(chalk.green(`✓ Found existing space: ${targetSpace.name}`));
+      } else {
+        // Create new space with the provided name
+        console.log(chalk.yellow(`Creating new space: ${this.config.spaceName}...`));
+        const newSpace = await this.createSpace(this.config.workspaceId, this.config.spaceName);
+        this.config.spaceId = newSpace.id;
+        this.config.spaceName = newSpace.name;
+        console.log(chalk.green(`✓ Created space: ${newSpace.name}`));
+      }
+      return;
     }
 
+    // No space name or ID - use default "Agentic Development"
+    console.log(chalk.yellow('\nSetting up default Agentic Development space...'));
+    
     const spaces = await this.api.getSpaces(this.config.workspaceId);
     const agenticSpace = spaces.find(s => 
       s.name === 'Agentic Development' || 
@@ -285,34 +326,7 @@ export class QuickSetup {
     }
   }
 
-  /**
-   * Create Agentic Development space with features
-   */
-  private async createAgenticSpace(): Promise<ClickUpSpace> {
-    const spaceData = {
-      name: 'Agentic Development',
-      multiple_assignees: true,
-      features: {
-        due_dates: {
-          enabled: true,
-          start_date: true,
-          remap_due_dates: false,
-          remap_closed_due_date: false
-        },
-        tags: { enabled: true },
-        time_estimates: { enabled: true },
-        custom_fields: { enabled: true },
-        remap_dependencies: { enabled: true },
-        dependency_warning: { enabled: true }
-      }
-    };
-
-    return await this.api.makeRequest(
-      `/team/${this.config.workspaceId}/space`,
-      'POST',
-      spaceData
-    );
-  }
+  // Removed duplicate - using the one at line 589
 
   /**
    * Create Commits list with specific statuses
@@ -506,6 +520,53 @@ See the full guide at: https://github.com/hellocory/clickmongrel/docs/STATUS_SET
   }
 
   /**
+   * Create a new space with custom name
+   */
+  private async createSpace(workspaceId: string, name: string): Promise<ClickUpSpace> {
+    const spaceData = {
+      name,
+      multiple_assignees: true,
+      features: {
+        due_dates: {
+          enabled: true,
+          start_date: true,
+          remap_due_dates: false,
+          remap_closed_due_date: false
+        },
+        time_tracking: { enabled: true },
+        tags: { enabled: true },
+        time_estimates: { enabled: true },
+        checklists: { enabled: true },
+        custom_fields: { enabled: true },
+        remap_dependencies: { enabled: false },
+        dependency_warning: { enabled: true },
+        portfolios: { enabled: true }
+      }
+    };
+    
+    const space = await this.api.makeRequest(
+      `/team/${workspaceId}/space`,
+      'POST',
+      spaceData
+    );
+    
+    // Wait for space to be ready
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    return space;
+  }
+
+  /**
+   * Create the default Agentic Development space
+   */
+  private async createAgenticSpace(): Promise<ClickUpSpace> {
+    if (!this.config.workspaceId) {
+      throw new Error('No workspace ID available');
+    }
+    return this.createSpace(this.config.workspaceId, 'Agentic Development');
+  }
+
+  /**
    * Display setup summary
    */
   private displaySummary(): void {
@@ -547,31 +608,48 @@ See the full guide at: https://github.com/hellocory/clickmongrel/docs/STATUS_SET
 if (process.argv[1]?.endsWith('quick-setup.ts') || process.argv[1]?.endsWith('quick-setup.js')) {
   const args = process.argv.slice(2);
   
-  // Parse arguments
+  // Parse arguments - support both positional and named arguments
   let apiKey = process.env.CLICKUP_API_KEY;
+  let workspaceName: string | undefined;
+  let spaceName: string | undefined;
   let spaceId: string | undefined;
   let folderId: string | undefined;
   
-  for (let i = 0; i < args.length; i++) {
-    if (args[i] === '--api-key' && args[i + 1]) {
-      apiKey = args[i + 1];
-      i++;
-    } else if (args[i] === '--space' && args[i + 1]) {
-      spaceId = args[i + 1];
-      i++;
-    } else if (args[i] === '--folder' && args[i + 1]) {
-      folderId = args[i + 1];
-      i++;
+  // Check for positional arguments first (for backward compatibility)
+  // Format: quick-setup.js "workspace name" "project name" "list name" ...
+  if (args.length > 0 && !args[0]?.startsWith('--')) {
+    workspaceName = args[0]; // First positional arg is workspace name
+    // Skip other positional args for now
+  } else {
+    // Parse named arguments
+    for (let i = 0; i < args.length; i++) {
+      if (args[i] === '--api-key' && args[i + 1]) {
+        apiKey = args[i + 1];
+        i++;
+      } else if (args[i] === '--workspace' && args[i + 1]) {
+        workspaceName = args[i + 1];
+        i++;
+      } else if (args[i] === '--space-name' && args[i + 1]) {
+        spaceName = args[i + 1];
+        i++;
+      } else if (args[i] === '--space' && args[i + 1]) {
+        spaceId = args[i + 1];
+        i++;
+      } else if (args[i] === '--folder' && args[i + 1]) {
+        folderId = args[i + 1];
+        i++;
+      }
     }
   }
   
   if (!apiKey) {
     console.error(chalk.red('Error: API key required'));
-    console.log('Usage: clickmongrel quick-setup --api-key <key> [--space <id>] [--folder <id>]');
+    console.log('Usage: clickmongrel quick-setup [workspace-name] OR');
+    console.log('       clickmongrel quick-setup --api-key <key> [--workspace <name>] [--space-name <name>] [--space <id>] [--folder <id>]');
     process.exit(1);
   }
   
-  const setup = new QuickSetup(apiKey, spaceId, folderId);
+  const setup = new QuickSetup(apiKey, workspaceName, spaceName, spaceId, folderId);
   setup.setup().catch(error => {
     console.error(chalk.red('Setup failed:'), error);
     process.exit(1);

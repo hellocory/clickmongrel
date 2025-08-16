@@ -1,43 +1,36 @@
 # ClickMongrel - ClickUp MCP Server for Claude
 
-A Model Context Protocol (MCP) server that seamlessly integrates Claude's TodoWrite with ClickUp, providing automatic task synchronization, commit tracking, and project management.
+A Model Context Protocol (MCP) server that seamlessly integrates Claude's TodoWrite with ClickUp, providing automatic task synchronization, commit tracking, time management, and comprehensive project tracking.
 
-## Features
+## 🚀 Features
 
+### Core Functionality
 - 🔄 **Automatic TodoWrite Sync** - Tasks created in Claude automatically sync to ClickUp
-- 📊 **Commit Lifecycle Tracking** - Track git commits through development stages
-- 📈 **Goal Management** - Track project goals and progress
-- 📝 **Report Generation** - Daily and weekly development reports
-- 🚀 **AI-Optimized Setup** - Simple one-command setup for Claude users
+- 👨‍👩‍👧‍👦 **Parent-Child Task Relationships** - Subtasks with automatic parent status management
+- ⏱️ **Time Tracking** - Automatic time tracking when tasks complete
+- 📝 **Commit Linking** - Links completed tasks to their commits
+- 📎 **Attachment Support** - Upload screenshots, demos, and files to tasks
+- 👤 **Auto-Assignment** - Tasks automatically assigned to configured user
+- 📊 **Status Lifecycle** - Tracks tasks through custom ClickUp statuses
+- 🎯 **Goal Management** - Track project goals and progress
+- 📈 **Report Generation** - Daily and weekly development reports
 
-## Quick Start
+### Enhanced Features (NEW)
+- **Smart Time Tracking** - Automatically tracks time from task start to completion
+- **Task-Commit Relationships** - Links tasks to the commits that complete them
+- **Attachment Uploads** - Add screenshots and demos to showcase functionality
+- **Parent Task Auto-Completion** - Parent tasks auto-complete when all subtasks finish
 
-### For Claude Users (Simplest)
+## 📋 Prerequisites
 
-When using Claude with ClickMongrel MCP installed, just say:
-- "Initialize ClickUp with [Your Workspace Name]"
-- "Setup ClickUp for this project"
-- "Connect to my ClickUp workspace"
+1. **ClickUp Account** with API access
+2. **Claude Code** with MCP support
+3. **Node.js** 18+ and pnpm
+4. **ClickUp API Key** - Get from ClickUp Settings → Apps → API Token
 
-Claude will automatically use the MCP tools to set everything up.
+## 🛠️ Installation
 
-### Manual Setup
-
-```bash
-# Install globally
-npm install -g @clickmongrel/mcp-server
-
-# Setup with API key
-clickmongrel setup-clickup --api-key <USER_API_KEY>
-
-# Or with specific workspace
-clickmongrel setup-clickup --api-key <KEY> --workspace-name "<workspace>"
-
-# Or create in new space
-clickmongrel setup-clickup --api-key <KEY> --space-name "Project Name"
-```
-
-### Installation
+### Option 1: From GitHub (Recommended)
 
 ```bash
 # Clone the repository
@@ -47,189 +40,246 @@ cd clickmongrel
 # Install dependencies
 pnpm install
 
-# Build
+# Build the project
 pnpm run build
 
-# Run setup
-node dist/cli.js setup-clickup --api-key <YOUR_API_KEY>
+# Test connection
+CLICKUP_API_KEY="your_api_key" node dist/cli.js test
 ```
 
-## MCP Integration with Claude
+### Option 2: NPM Global Install (Coming Soon)
+
+```bash
+npm install -g @clickmongrel/mcp-server
+```
+
+## ⚙️ Setup
+
+### Quick Setup (AI-Friendly)
+
+When using Claude with ClickMongrel, just say:
+- "setup clickmongrel with [Your Workspace Name]"
+- "setup clickmongrel in [workspace] in [space name]"
+
+### Manual Setup
+
+```bash
+# Basic setup - uses default "Agentic Development" space
+node dist/quick-setup.js --workspace "Your Workspace Name"
+
+# Setup with specific space
+node dist/quick-setup.js --workspace "Your Workspace" --space-name "Custom Space"
+
+# Setup with space ID (faster)
+node dist/quick-setup.js --workspace "Your Workspace" --space-id "90139256288"
+```
+
+## 🔌 MCP Integration
 
 ### Adding to Claude Code
 
 ```bash
-# Add the MCP server
+# Add the MCP server (NEVER put API key in config files!)
 claude mcp add clickmongrel \
-  --env CLICKUP_API_KEY=<YOUR_API_KEY> \
-  -- node /path/to/clickmongrel/dist/index.js
+  --env CLICKUP_API_KEY="your_api_key_here" \
+  -- node /absolute/path/to/clickmongrel/dist/index.js
 
-# Verify it's running
+# Verify it's connected
 claude mcp list
+
+# In Claude Code, check status
+/mcp
 ```
 
 ### Available MCP Tools
 
-Once installed, Claude can use these tools:
+| Tool | Description | Example Usage |
+|------|-------------|---------------|
+| `sync_todos` | Sync TodoWrite items to ClickUp | Automatic when using TodoWrite |
+| `add_attachment` | Upload files to tasks | "Add screenshot to this task" |
+| `create_goal` | Create project goals | "Create goal for authentication feature" |
+| `link_commit` | Link commits to tasks | Automatic on commit |
+| `generate_report` | Create status reports | "Generate weekly report" |
+| `validate_statuses` | Check ClickUp configuration | "Validate clickup statuses" |
 
-- `setup` - Quick setup with just workspace name
-- `initialize_clickup` - Full setup with all options
-- `sync_todos` - Sync TodoWrite items
-- `create_goal` - Create project goals
-- `link_commit` - Link commits to tasks
-- `generate_report` - Create status reports
-- `workflow_create_tasks` - Create task hierarchies
-- `workflow_complete_task` - Complete tasks with commits
-
-### Usage Examples in Claude
-
-Simply tell Claude:
-- "Initialize ClickUp with Ghost Codes Workspace"
-- "Sync my todos to ClickUp"
-- "Create a goal for this sprint"
-- "Generate a weekly report"
-
-## Configuration
-
-The setup creates a `.claude/clickup/` folder in your project with:
+## 📁 Project Structure
 
 ```
-.claude/
-└── clickup/
-    ├── config.json        # Main configuration
-    ├── mcp-env.json      # Environment variables
-    ├── cache/            # Temporary cache
-    ├── logs/             # Sync logs
-    └── reports/          # Generated reports
-        ├── daily/
-        └── weekly/
+your-project/
+└── .claude/
+    └── clickup/
+        ├── config.json           # Workspace & list IDs (NO API KEYS!)
+        ├── STATUS_SETUP_GUIDE.md # Instructions for ClickUp setup
+        ├── templates/            # Commit message templates
+        ├── reports/              # Generated reports
+        └── cache/                # Temporary cache
 ```
 
-## ClickUp Structure
+## ⚠️ CRITICAL: ClickUp Status Configuration
 
-The integration creates:
+**The system will NOT work until you configure custom statuses in ClickUp!**
 
-### Space: "Agentic Development" (or custom)
-- **Folders:**
-  - Weekly Reports - Weekly development summaries
-  - Daily Reports - Daily progress updates
-  - Docs - Documentation and context
+### Required Task Statuses
+1. Go to ClickUp → Your Space → Tasks list
+2. Click ⋮ menu → "Edit statuses"
+3. Choose "Custom statuses" 
+4. Add these EXACT statuses:
+   - `to do`
+   - `future`
+   - `in progress`
+   - `fixing`
+   - `completed`
 
-- **Lists:**
-  - **Commits** - Git commit tracking with lifecycle statuses
-  - **Tasks** - Task management synced with TodoWrite
+### Required Commit Statuses
+1. Go to ClickUp → Your Space → Commits list
+2. Click ⋮ menu → "Edit statuses"
+3. Add these EXACT statuses:
+   - `comitted`
+   - `developing`
+   - `prototyping`
+   - `rejected`
+   - `production/testing`
+   - `production/final`
 
-## Commit Lifecycle Statuses
+## 🎯 Usage Examples
 
-Commits are tracked through these stages:
+### Basic Task Management
 
-1. **COMMITTED** (gray) - Local commit
-2. **DEVELOPING** (yellow) - Pushed to development branch
-3. **PROTOTYPING** (purple) - Merged to staging
-4. **REJECTED** (orange) - Issues found/reverted
-5. **PRODUCTION/TESTING** (blue) - In production testing
-6. **PRODUCTION/FINAL** (green) - Stable in production
+```javascript
+// Claude TodoWrite automatically syncs
+TodoWrite([
+  { id: "task-1", content: "Setup database", status: "pending" },
+  { id: "task-2", content: "Create API", status: "in_progress" }
+])
+```
 
-## Task Statuses
+### Parent-Child Tasks
 
-Tasks sync with these statuses:
+```javascript
+// Create tasks with subtasks
+TodoWrite([
+  { id: "feature", content: "User Authentication", status: "pending" },
+  { id: "sub-1", content: "Login form", status: "pending", parent_id: "feature" },
+  { id: "sub-2", content: "JWT tokens", status: "pending", parent_id: "feature" }
+])
+// Parent auto-updates to "in_progress" when subtask starts
+// Parent auto-completes when all subtasks complete
+```
 
-- **to do** (gray) - Not started
-- **future** (blue) - Planned for future
-- **in progress** (yellow) - Currently working
-- **fixing** (orange) - Fixing issues
-- **completed** (green) - Done
+### Enhanced Features
 
-## CLI Commands
+```javascript
+// Time tracking (automatic)
+// When task goes from in_progress → completed, time is tracked
+
+// Add attachments
+mcp.add_attachment({
+  task_id: "task-1",
+  file_path: "/path/to/screenshot.png",
+  file_name: "Dashboard Screenshot"
+})
+
+// Tasks automatically link to commits that complete them
+```
+
+## 🔧 Configuration
+
+### Environment Variables
 
 ```bash
-# Setup
-clickmongrel setup-clickup --api-key <KEY> [options]
-
-# Status check
-clickmongrel status
-
-# Test connection
-clickmongrel test
-
-# Track commits
-clickmongrel commit track              # Track current commit
-clickmongrel commit status --hash <HASH> --status <EVENT>
-
-# Generate reports
-clickmongrel report daily
-clickmongrel report weekly
-
-# Goal management
-clickmongrel goal --current            # Show current goal
-clickmongrel goal --progress <percent>  # Update progress
+CLICKUP_API_KEY=pk_xxx          # Your ClickUp API key (REQUIRED)
+CLICKUP_WORKSPACE_ID=xxx         # Optional: Default workspace
+CLICKUP_SPACE_ID=xxx            # Optional: Default space
+LOG_LEVEL=info                  # Logging level (debug|info|warn|error)
 ```
 
-## Environment Variables
+### Security Best Practices
 
-```bash
-# Required
-CLICKUP_API_KEY=your_api_key
+⚠️ **NEVER store API keys in:**
+- Config files (`.json`, `.env`)
+- Git repositories
+- Project directories
 
-# Optional (auto-detected)
-CLICKUP_WORKSPACE_ID=workspace_id
-CLICKUP_SPACE_ID=space_id
-```
+✅ **ALWAYS pass API keys via:**
+- `--env` flag when adding MCP
+- Environment variables at runtime
+- Claude Code's secure storage
 
-## MCP Integration
+## 📊 Features in Detail
 
-Add to Claude's MCP servers:
+### Time Tracking
+- Automatically starts when task status → `in_progress`
+- Stops and records time when status → `completed`
+- Updates ClickUp with actual time spent
 
-```bash
-claude mcp add clickmongrel -- node /path/to/clickmongrel/dist/index.js
-```
+### Commit Linking
+- Each commit creates a task in Commits list
+- Completed tasks link to their final commit
+- Full development traceability
 
-## Manual Configuration Required
+### Attachment Support
+- Upload screenshots, documents, or any file
+- Claude can prompt: "Would you like to add a screenshot?"
+- Files attached directly to ClickUp tasks
 
-After setup, manually configure custom statuses in ClickUp:
+### Parent Task Management
+- Parent tasks auto-update based on subtasks
+- Status flows: `pending` → `in_progress` → `completed`
+- Automatic completion when all subtasks done
 
-1. Open ClickUp and navigate to your space
-2. For each list (Commits and Tasks):
-   - Click ... → List Settings → Statuses
-   - Add the custom statuses as specified above
+## 🐛 Troubleshooting
 
-## API Key
+### "Status validation failed"
+- Configure custom statuses in ClickUp (see Status Configuration above)
+- Run `clickmongrel check-statuses` to verify
 
-Get your ClickUp API key:
-1. Go to ClickUp Settings
-2. Click "Apps" → "API Token"
-3. Generate and copy your personal token
+### "No list ID available"
+- Run setup again: `node dist/quick-setup.js --workspace "Your Workspace"`
 
-## Development
+### "Invalid API key"
+- Check API key is correct
+- Ensure it's passed via `--env` flag, not in config files
 
-```bash
-# Install dependencies
-pnpm install
+### Tasks not syncing
+1. Check statuses are configured
+2. Verify API key is set
+3. Ensure workspace/space are correct
+4. Check logs: `LOG_LEVEL=debug node dist/index.js`
 
-# Build
-pnpm run build
+## 🤝 Contributing
 
-# Run tests
-pnpm test
+Contributions welcome! Please:
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
 
-# Development mode
-pnpm run dev
-```
+## 📄 License
 
-## Security
+MIT License - See LICENSE file for details
 
-- Never commit API keys to version control
-- Use environment variables for sensitive data
-- API keys are stored locally in `.claude/clickup/config.json`
+## 🔗 Links
 
-## License
+- [GitHub Repository](https://github.com/yourusername/clickmongrel)
+- [MCP Documentation](https://modelcontextprotocol.io)
+- [ClickUp API Docs](https://clickup.com/api)
 
-MIT
+## 💡 Tips for Claude Users
 
-## Contributing
+1. **Let Claude handle setup**: Just tell Claude your workspace name
+2. **Use natural language**: "Create a goal for this feature"
+3. **TodoWrite integration**: Automatic - just use TodoWrite normally
+4. **Ask for attachments**: Claude can prompt for screenshots
+5. **Check progress**: "Show sync status" or "Validate statuses"
 
-Contributions are welcome! Please read our contributing guidelines before submitting PRs.
+## 🚨 Important Notes
 
-## Support
+- This is a PUBLIC project - never reference specific workspaces in code
+- API keys must NEVER be stored in project files
+- Always use environment variables for sensitive data
+- Configure ClickUp statuses before first use
 
-For issues or questions, please open an issue on GitHub.
+---
+
+**Built for developers using Claude Code with ClickUp integration needs**

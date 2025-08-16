@@ -1,5 +1,5 @@
-import { SyncHandler } from '../dist/handlers/sync.js';
-import configManager from '../dist/config/index.js';
+import { SyncHandler } from '../../dist/handlers/sync.js';
+import configManager from '../../dist/config/index.js';
 import chalk from 'chalk';
 
 console.log(chalk.cyan('\n🔍 Debugging Auto-Assignment Configuration\n'));

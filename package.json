@@ -1,13 +1,21 @@
 {
   "name": "@clickmongrel/mcp-server",
   "version": "1.0.0",
-  "description": "ClickUp Integration MCP Server for seamless task management and synchronization",
+  "description": "ClickUp MCP Server for Claude - Seamless task sync, time tracking, and project management",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
     "clickmongrel": "dist/cli.js",
     "clickmongrel-server": "dist/index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/clickmongrel.git"
+  },
+  "homepage": "https://github.com/yourusername/clickmongrel#readme",
+  "bugs": {
+    "url": "https://github.com/yourusername/clickmongrel/issues"
   },
   "scripts": {
     "build": "tsc",
@@ -31,10 +39,12 @@
   "license": "MIT",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^0.6.0",
+    "@types/form-data": "^2.5.2",
     "axios": "^1.7.2",
     "chalk": "^5.3.0",
     "commander": "^12.0.0",
     "dotenv": "^16.4.5",
+    "form-data": "^4.0.4",
     "inquirer": "^9.2.23",
     "node-cache": "^5.1.2",
     "winston": "^3.13.0",

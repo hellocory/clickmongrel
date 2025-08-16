@@ -215,6 +215,14 @@ export class WorkspaceResolver {
     variations.push(name.replace(/\s+workspace$/i, ''));
     variations.push(name.replace(/['']s$/i, ''));
     
+    // If name ends with "workspace", try adding possessive
+    if (name.toLowerCase().endsWith('workspace')) {
+      const base = name.replace(/\s+workspace$/i, '').trim();
+      variations.push(`${base}'s Workspace`);
+      variations.push(`${base}s Workspace`);
+      variations.push(`${base}'s Workspace`);
+    }
+    
     // Add common suffixes
     variations.push(`${name} Workspace`);
     variations.push(`${name}'s Workspace`);
@@ -224,7 +232,16 @@ export class WorkspaceResolver {
     variations.push(name.replace(/['']/g, ''));
     variations.push(name.replace(/['']/g, "'"));
     
-    return variations;
+    // Handle "X workspace" -> "X's workspace" pattern
+    if (name.toLowerCase().includes(' workspace') && !name.includes("'")) {
+      const parts = name.split(/\s+workspace/i);
+      if (parts[0]) {
+        variations.push(`${parts[0]}'s Workspace`);
+        variations.push(`${parts[0]}'s Workspace`);
+      }
+    }
+    
+    return [...new Set(variations)]; // Remove duplicates
   }
 
   /**

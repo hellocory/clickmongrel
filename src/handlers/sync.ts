@@ -12,7 +12,9 @@ export class SyncHandler {
   private syncQueue: Map<string, TodoItem>;
   private syncInProgress: boolean;
   private listId: string | undefined;
-  private taskIdMap: Map<string, string>; // Maps todo.id to ClickUp task.id
+  private taskIdMap: Map<string, string>;
+  private taskStartTimes: Map<string, number>;
+  private lastCommitForTask: Map<string, string>; // Maps todo.id to ClickUp task.id
 
   constructor(apiKey: string, listId?: string) {
     this.api = new ClickUpAPI(apiKey);
@@ -22,6 +24,8 @@ export class SyncHandler {
     this.taskIdMap = new Map();
     this.statusValidator = new StatusValidator(apiKey);
     this.statusesValidated = false;
+    this.taskStartTimes = new Map(); // Track when tasks start
+    this.lastCommitForTask = new Map(); // Track last commit ID for each task
   }
   
   private statusValidator: StatusValidator;
@@ -187,9 +191,15 @@ export class SyncHandler {
     // Log time tracking events
     if (analyzed.started_at && !original.started_at) {
       logger.info(`⏱️ Task started: ${analyzed.title || analyzed.content} (${analyzed.id})`);
+      // Store start time for duration calculation
+      this.taskStartTimes.set(analyzed.id, Date.now());
     }
     
     if (analyzed.completed_at && !original.completed_at) {
+      // Calculate actual time spent
+      // const startTime = this.taskStartTimes.get(analyzed.id);
+      // const actualTimeMs = startTime ? Date.now() - startTime : 0;
+      
       const duration = analyzed.actual_time ? TaskAnalyzer.formatDuration(analyzed.actual_time) : 'unknown';
       const estimated = analyzed.estimated_time ? TaskAnalyzer.formatDuration(analyzed.estimated_time) : 'not estimated';
       const efficiency = analyzed.actual_time && analyzed.estimated_time 
@@ -478,6 +488,11 @@ export class SyncHandler {
     if (currentStatus !== newStatus) {
       await this.api.updateTaskStatus(task.id, newStatus);
       logger.info(`Updated task ${task.id} status from ${currentStatus} to ${newStatus}`);
+      
+      // Handle task completion enhancements
+      if (todo.status === 'completed') {
+        await this.handleTaskCompletion(task.id, todo.id);
+      }
     }
     
     // Always check parent status after updating a subtask
@@ -638,12 +653,58 @@ export class SyncHandler {
     return new Map(this.taskIdMap);
   }
 
+  getClickUpTaskId(todoId: string): string | undefined {
+    return this.taskIdMap.get(todoId);
+  }
+
   getSyncStatus(): { queueSize: number; inProgress: boolean; listId: string | undefined } {
     return {
       queueSize: this.syncQueue.size,
       inProgress: this.syncInProgress,
       listId: this.listId
     };
+  }
+
+  // Enhanced features for attachments and time tracking
+  async handleTaskCompletion(clickUpTaskId: string, todoId: string): Promise<void> {
+    try {
+      // Update time tracked if we have start time
+      const startTime = this.taskStartTimes.get(todoId);
+      if (startTime) {
+        const timeSpentMs = Date.now() - startTime;
+        await this.api.updateTimeTracked(clickUpTaskId, timeSpentMs);
+        logger.info(`Updated time tracked for task ${clickUpTaskId}: ${Math.round(timeSpentMs / 1000 / 60)} minutes`);
+        this.taskStartTimes.delete(todoId);
+      }
+
+      // Link to last commit if available
+      const lastCommitId = this.lastCommitForTask.get(todoId);
+      if (lastCommitId) {
+        await this.api.linkTaskToCommit(clickUpTaskId, lastCommitId);
+        logger.info(`Linked task ${clickUpTaskId} to commit ${lastCommitId}`);
+      }
+    } catch (error) {
+      logger.error(`Failed to handle task completion for ${clickUpTaskId}:`, error);
+    }
+  }
+
+  async promptForAttachment(todoContent: string): Promise<void> {
+    // This would be called by Claude to ask user about attachments
+    logger.info(`Would you like to add an attachment for "${todoContent}"? (screenshot, demo, etc.)`);
+    // In practice, this would trigger a user interaction through the MCP protocol
+  }
+
+  async addTaskAttachment(clickUpTaskId: string, filePath: string, fileName?: string): Promise<void> {
+    try {
+      await this.api.addAttachment(clickUpTaskId, filePath, fileName);
+      logger.info(`Added attachment to task ${clickUpTaskId}: ${fileName || filePath}`);
+    } catch (error) {
+      logger.error(`Failed to add attachment to task ${clickUpTaskId}:`, error);
+    }
+  }
+
+  setLastCommitForTask(todoId: string, commitTaskId: string): void {
+    this.lastCommitForTask.set(todoId, commitTaskId);
   }
 }
 

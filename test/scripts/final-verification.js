@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
-import { ClickUpAPI } from '../dist/utils/clickup-api.js';
-import { StatusValidator } from '../dist/utils/status-validator.js';
-import { SyncHandler } from '../dist/handlers/sync.js';
-import { CommitHandler } from '../dist/handlers/commits.js';
+import { ClickUpAPI } from '../../dist/utils/clickup-api.js';
+import { StatusValidator } from '../../dist/utils/status-validator.js';
+import { SyncHandler } from '../../dist/handlers/sync.js';
+import { CommitHandler } from '../../dist/handlers/commits.js';
 import chalk from 'chalk';
 
 console.log(chalk.cyan.bold('\n🧪 Final Verification Test\n'));

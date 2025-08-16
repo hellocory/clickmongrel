@@ -345,6 +345,70 @@ export class ClickUpAPI {
     logger.info(`Updated custom field ${fieldId} for task ${taskId}`);
   }
 
+  // Attachment methods
+  async addAttachment(taskId: string, filePath: string, fileName?: string): Promise<any> {
+    const fs = await import('fs');
+    const FormData = (await import('form-data')).default;
+    
+    const form = new FormData();
+    form.append('attachment', fs.createReadStream(filePath), fileName || filePath.split('/').pop());
+    
+    const response = await this.client.post(`/task/${taskId}/attachment`, form, {
+      headers: form.getHeaders()
+    });
+    
+    logger.info(`Added attachment to task ${taskId}: ${fileName || filePath}`);
+    return response.data;
+  }
+
+  // Time tracking methods
+  async updateTimeTracked(taskId: string, timeSpentMs: number): Promise<void> {
+    // ClickUp expects time in milliseconds
+    await this.client.put(`/task/${taskId}`, {
+      time_spent: timeSpentMs
+    });
+    logger.info(`Updated time tracked for task ${taskId}: ${timeSpentMs}ms`);
+  }
+
+  async startTimeTracking(taskId: string): Promise<void> {
+    // Store start time for later calculation
+    await this.client.post(`/task/${taskId}/time_entries/start`, {
+      description: 'Working on task'
+    });
+    logger.info(`Started time tracking for task ${taskId}`);
+  }
+
+  async stopTimeTracking(taskId: string): Promise<number> {
+    // Stop time tracking and return total time spent
+    const response = await this.client.post(`/task/${taskId}/time_entries/stop`);
+    const timeSpent = response.data.duration || 0;
+    logger.info(`Stopped time tracking for task ${taskId}: ${timeSpent}ms`);
+    return timeSpent;
+  }
+
+  // Relationship methods
+  async addTaskDependency(taskId: string, dependsOnTaskId: string): Promise<void> {
+    await this.client.post(`/task/${taskId}/dependency`, {
+      depends_on: dependsOnTaskId
+    });
+    logger.info(`Added dependency: ${taskId} depends on ${dependsOnTaskId}`);
+  }
+
+  async linkTaskToCommit(taskId: string, commitTaskId: string): Promise<void> {
+    // Add a comment linking to the commit task
+    const commitUrl = `https://app.clickup.com/t/${commitTaskId}`;
+    await this.addTaskComment(taskId, `📝 Completed by commit: ${commitUrl}`);
+    
+    // Also try to add as a linked task if supported
+    try {
+      await this.client.post(`/task/${taskId}/link/${commitTaskId}`);
+      logger.info(`Linked task ${taskId} to commit ${commitTaskId}`);
+    } catch (error) {
+      // Linking might not be available, comment is sufficient
+      logger.debug(`Could not create task link, comment added instead`);
+    }
+  }
+
   // Batch operations
   async batchUpdateTaskStatuses(updates: Array<{ taskId: string; status: string }>): Promise<void> {
     const promises = updates.map(({ taskId, status }) => 

@@ -1,4 +1,4 @@
-import { SyncHandler } from '../dist/handlers/sync.js';
+import { SyncHandler } from '../../dist/handlers/sync.js';
 import chalk from 'chalk';
 
 console.log(chalk.cyan('\n🧪 Testing Status Validation Failure\n'));

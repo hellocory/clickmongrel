@@ -1,7 +1,7 @@
-import ClickUpAPI from '../dist/utils/clickup-api.js';
+import ClickUpAPI from '../../dist/utils/clickup-api.js';
 import chalk from 'chalk';
 
-const api = new ClickUpAPI('pk_138190514_O3WELFAWWV5OHNYNZBZVVLRH2D5FO4RK');
+const api = new ClickUpAPI(process.env.CLICKUP_API_KEY);
 const GHOST_WORKSPACE_ID = '90131285250';
 
 async function createAgenticDevelopmentSpace() {
@@ -55,15 +55,15 @@ async function createAgenticDevelopmentSpace() {
     console.log(chalk.cyan('\nCreating lists...'));
     
     const lists = [
-      { name: 'Tasks', content: 'Development tasks from TodoWrite' },
-      { name: 'Commits', content: 'Git commit tracking' }
+      { name: 'Tasks', description: 'Development tasks from TodoWrite' },
+      { name: 'Commits', description: 'Git commit tracking' }
     ];
     
     for (const list of lists) {
       try {
         const newList = await api.createList(newSpace.id, {
           name: list.name,
-          content: list.content,
+          content: list.description,
           status: 'active',
           priority: 1
         });
@@ -77,41 +77,53 @@ async function createAgenticDevelopmentSpace() {
     console.log(chalk.cyan('\nCreating folders...'));
     
     const folders = [
-      { name: 'Weekly Reports' },
-      { name: 'Daily Reports' },
-      { name: 'Documentation' }
+      { name: 'Weekly Reports', description: 'Weekly development reports' },
+      { name: 'Daily Reports', description: 'Daily progress updates' },
+      { name: 'Documentation', description: 'Project documentation' }
     ];
     
     for (const folder of folders) {
       try {
-        const newFolder = await api.createFolder(newSpace.id, folder);
+        const newFolder = await api.createFolder(newSpace.id, {
+          name: folder.name
+        });
         console.log(chalk.green(`  ✓ Created folder: ${folder.name} (ID: ${newFolder.id})`));
       } catch (error) {
         console.log(chalk.yellow(`  ⚠ Could not create folder ${folder.name}: ${error.message}`));
       }
     }
     
+    // Step 6: Create custom statuses for Commits list
+    console.log(chalk.cyan('\nSetting up Commits list statuses...'));
+    
+    // Get the Commits list
+    const allLists = await api.getLists(newSpace.id);
+    const commitsList = allLists.find(l => l.name === 'Commits');
+    
+    if (commitsList) {
+      const commitStatuses = [
+        { status: 'development update', color: '#5b9fd6', orderindex: 0 },
+        { status: 'development push', color: '#f9d900', orderindex: 1 },
+        { status: 'upstream merge', color: '#ff7fab', orderindex: 2 },
+        { status: 'merged', color: '#6bc950', orderindex: 3 }
+      ];
+      
+      console.log(chalk.gray('  Note: Custom statuses must be added manually in ClickUp'));
+      console.log(chalk.gray('  Recommended statuses for Commits list:'));
+      commitStatuses.forEach(s => {
+        console.log(chalk.gray(`    - ${s.status}`));
+      });
+    }
+    
     console.log(chalk.green.bold('\n✅ Agentic Development space created successfully!\n'));
-    
-    // Get the final list of lists to show IDs
-    const finalLists = await api.getLists(newSpace.id);
-    const tasksList = finalLists.find(l => l.name === 'Tasks');
-    const commitsList = finalLists.find(l => l.name === 'Commits');
-    
     console.log('Space ID:', newSpace.id);
-    console.log('Tasks List ID:', tasksList?.id);
+    console.log('Tasks List ID:', allLists.find(l => l.name === 'Tasks')?.id);
     console.log('Commits List ID:', commitsList?.id);
-    
-    console.log(chalk.yellow('\n📝 Next step: Run quick-setup with this space ID:'));
-    console.log(chalk.cyan(`node dist/cli.js quick-setup --space ${newSpace.id}`));
     
     return newSpace;
     
   } catch (error) {
     console.error(chalk.red('Error:'), error.message);
-    if (error.response?.data) {
-      console.error(chalk.red('Details:'), JSON.stringify(error.response.data, null, 2));
-    }
     throw error;
   }
 }

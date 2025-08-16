@@ -1,7 +1,7 @@
-import ClickUpAPI from '../dist/utils/clickup-api.js';
+import ClickUpAPI from '../../dist/utils/clickup-api.js';
 import chalk from 'chalk';
 
-const api = new ClickUpAPI('pk_138190514_O3WELFAWWV5OHNYNZBZVVLRH2D5FO4RK');
+const api = new ClickUpAPI(process.env.CLICKUP_API_KEY);
 const AGENTIC_SPACE_ID = '90139256189';
 
 async function createLists() {

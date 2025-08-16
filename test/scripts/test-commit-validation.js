@@ -1,4 +1,4 @@
-import { CommitHandler } from '../dist/handlers/commits.js';
+import { CommitHandler } from '../../dist/handlers/commits.js';
 import chalk from 'chalk';
 
 console.log(chalk.cyan('\n🧪 Testing Commit Status Validation\n'));

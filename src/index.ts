@@ -200,6 +200,19 @@ class ClickMongrelServer {
           }
         },
         {
+          name: 'add_attachment',
+          description: 'Add an attachment (screenshot, file, etc.) to a ClickUp task',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              task_id: { type: 'string', description: 'ClickUp task ID or todo ID' },
+              file_path: { type: 'string', description: 'Path to the file to attach' },
+              file_name: { type: 'string', description: 'Optional custom name for the attachment' }
+            },
+            required: ['task_id', 'file_path']
+          }
+        },
+        {
           name: 'get_task',
           description: 'Get details of a specific task',
           inputSchema: {
@@ -323,11 +336,11 @@ class ClickMongrelServer {
         },
         {
           name: 'setup',
-          description: 'Quick setup - Initialize ClickUp for this project with a workspace name',
+          description: 'Quick setup - Initialize ClickUp for this project. Examples: "setup clickmongrel with ghost codes workspace" or "setup clickmongrel in ghost codes workspace in the test space"',
           inputSchema: {
             type: 'object',
             properties: {
-              workspace: { type: 'string', description: 'Your ClickUp workspace name' }
+              workspace: { type: 'string', description: 'Natural language describing workspace and optionally space. E.g., "ghost codes workspace" or "ghost codes workspace in the test space"' }
             },
             required: ['workspace']
           }
@@ -576,6 +589,26 @@ class ClickMongrelServer {
             };
           }
 
+          case 'add_attachment': {
+            const { task_id, file_path, file_name } = request.params.arguments as any;
+            
+            // Try to get ClickUp task ID if todo ID was provided
+            let clickUpTaskId = task_id;
+            const mappedId = this.syncHandler.getClickUpTaskId(task_id);
+            if (mappedId) {
+              clickUpTaskId = mappedId;
+            }
+            
+            await this.syncHandler.addTaskAttachment(clickUpTaskId, file_path, file_name);
+            
+            return {
+              content: [{
+                type: 'text',
+                text: `✅ Attachment added to task ${clickUpTaskId}`
+              }]
+            };
+          }
+
           case 'get_task': {
             const taskId = args?.task_id as string;
             const task = await this.taskHandler.getTask(taskId);
@@ -697,27 +730,60 @@ class ClickMongrelServer {
           }
 
           case 'setup': {
-            // Simple setup with just workspace name
-            const workspace = args?.workspace as string;
+            // Parse natural language input to extract workspace and space
+            const { NaturalLanguageParser } = await import('./utils/nl-parser.js');
+            const parsed = NaturalLanguageParser.parseSetupCommand(args?.workspace as string || '');
             
-            // Call the full initialize with defaults
             const { execSync } = await import('child_process');
             const cwd = process.cwd();
-            const projectName = cwd.split('/').pop() || 'Project';
             
             try {
-              const result = execSync(
-                `node ${__dirname}/quick-setup.js "${workspace}" "${projectName}" "Tasks" true true`,
-                { cwd, encoding: 'utf-8' }
-              );
+              // Build command with workspace and optional space
+              let command = `node ${__dirname}/quick-setup.js`;
               
-              // Use the user-provided workspace name, not the API's version
-              const displayWorkspace = workspace;
+              if (parsed.workspace) {
+                command += ` --workspace "${parsed.workspace}"`;
+              }
+              
+              if (parsed.space) {
+                command += ` --space-name "${parsed.space}"`;
+              }
+              
+              logger.info(`Setup command parsed: workspace="${parsed.workspace}", space="${parsed.space}"`);
+              logger.debug(`Executing: ${command}`);
+              
+              const result = execSync(command, { cwd, encoding: 'utf-8' });
+              
+              // Build response message
+              let responseText = `✅ ClickUp integration setup complete!\n\n`;
+              
+              if (parsed.workspace) {
+                responseText += `Workspace: ${parsed.workspace}\n`;
+              }
+              
+              if (parsed.space) {
+                responseText += `Space: ${parsed.space}\n`;
+              } else {
+                responseText += `Space: Agentic Development (default)\n`;
+              }
+              
+              responseText += `Lists: Tasks & Commits\n\n`;
+              responseText += `✨ Features ready:\n`;
+              responseText += `- TodoWrite sync\n`;
+              responseText += `- Commit tracking\n`;
+              responseText += `- Goal tracking\n\n`;
+              responseText += `⚠️ **IMPORTANT**: Your integration is set up, but you need to configure custom statuses in ClickUp before it will work.\n\n`;
+              responseText += `📋 **Next Steps**:\n`;
+              responseText += `1. Check the STATUS_SETUP_GUIDE.md file in .claude/clickup/\n`;
+              responseText += `2. Configure the custom statuses in ClickUp\n`;
+              responseText += `3. Ask me to "validate clickup statuses" to verify everything is working\n\n`;
+              responseText += `Once statuses are configured, the integration will work as expected!\n\n`;
+              responseText += result;
               
               return {
                 content: [{
                   type: 'text',
-                  text: `✅ ClickUp integration setup complete!\n\nWorkspace: ${displayWorkspace}\nSpace: ${projectName}\nLists: Tasks & Commits\n\n✨ Features ready:\n- TodoWrite sync\n- Commit tracking\n- Goal tracking\n\n⚠️ **IMPORTANT**: Your integration is set up, but you need to configure custom statuses in ClickUp before it will work.\n\n📋 **Next Steps**:\n1. Check the STATUS_SETUP_GUIDE.md file in .claude/clickup/\n2. Configure the custom statuses in ClickUp\n3. Ask me to "validate clickup statuses" to verify everything is working\n\nOnce statuses are configured, the integration will work as expected!\n\n${result}`
+                  text: responseText
                 }]
               };
             } catch (error: any) {

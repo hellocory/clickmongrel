@@ -1,6 +1,6 @@
-import ClickUpAPI from '../dist/utils/clickup-api.js';
+import ClickUpAPI from '../../dist/utils/clickup-api.js';
 
-const api = new ClickUpAPI('pk_138190514_O3WELFAWWV5OHNYNZBZVVLRH2D5FO4RK');
+const api = new ClickUpAPI(process.env.CLICKUP_API_KEY);
 
 async function findTestTasks() {
   try {

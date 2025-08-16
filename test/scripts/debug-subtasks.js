@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import ClickUpAPI from '../dist/utils/clickup-api.js';
+import ClickUpAPI from '../../dist/utils/clickup-api.js';
 import chalk from 'chalk';
 
 const API_KEY = 'pk_138190514_O3WELFAWWV5OHNYNZBZVVLRH2D5FO4RK';

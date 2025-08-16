@@ -46,16 +46,50 @@ async function main() {
       process.exit(0);
     }
 
-    // Call the MCP server to sync todos
-    // In production, this would use the MCP client SDK
-    // For now, we'll log the action
-    console.error(`[ClickMongrel] Syncing ${todos.length} todos to ClickUp`);
+    // Import sync handler and sync the todos
+    const { default: SyncHandler } = await import('../handlers/sync.js');
+    const fs = await import('fs');
+    const path = await import('path');
     
-    // Log todo status changes
+    // Read config to get API key
+    const configPath = path.join(hookData.cwd, '.claude', 'clickup', 'config.json');
+    let apiKey = process.env.CLICKUP_API_KEY;
+    
+    if (!apiKey && fs.existsSync(configPath)) {
+      const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+      apiKey = config.apiKey;
+    }
+    
+    if (!apiKey) {
+      console.error('[ClickMongrel] No API key found, skipping sync');
+      process.exit(0);
+    }
+    
+    // Initialize sync handler and sync todos
+    console.error(`[ClickMongrel] Syncing ${todos.length} todos to ClickUp...`);
+    
+    const handler = new SyncHandler(apiKey);
+    await handler.initialize();
+    
+    // Check if we have a list configured
+    const status = handler.getSyncStatus();
+    if (!status.listId) {
+      console.error('[ClickMongrel] No list configured, run setup first');
+      process.exit(0);
+    }
+    
+    // Log todos being synced
     todos.forEach(todo => {
-      console.error(`[ClickMongrel] Todo ${todo.id}: ${todo.status} - ${todo.content.substring(0, 50)}...`);
+      const statusIcon = todo.status === 'completed' ? '✓' : 
+                        todo.status === 'in_progress' ? '⚡' : '○';
+      console.error(`[ClickMongrel] ${statusIcon} ${todo.content.substring(0, 50)}`);
     });
-
+    
+    // Sync todos (returns void, but logs internally)
+    await handler.syncTodos(todos);
+    
+    console.error(`[ClickMongrel] Sync request sent to ClickUp`);
+    
     // Success
     process.exit(0);
   } catch (error) {
