@@ -1,0 +1,95 @@
+// Custom color scheme for ClickMongrel
+
+// Main colors
+$purple-000: #f5f3ff;
+$purple-100: #e6e1ff;
+$purple-200: #d4ccff;
+$purple-300: #b3a6ff;
+$purple-400: #9180ff;
+$purple-500: #7B3FF2;
+$purple-600: #6633cc;
+$purple-700: #5229a3;
+$purple-800: #3d1f7a;
+$purple-900: #291552;
+
+$blue-400: #2196F3;
+$cyan-400: #00BCD4;
+$green-400: #4CAF50;
+
+// Override theme colors
+$body-background-color: #ffffff;
+$sidebar-color: $purple-000;
+$search-background-color: #ffffff;
+$table-background-color: #ffffff;
+$code-background-color: $purple-000;
+
+$body-text-color: #333333;
+$body-heading-color: $purple-800;
+$search-result-preview-color: #666666;
+
+$link-color: $purple-600;
+$btn-primary-color: $purple-600;
+$base-button-color: #f7f7f7;
+
+// Navigation
+$nav-child-link-color: $purple-600;
+$nav-list-item-height: 2.5rem;
+$nav-list-item-height-sm: 2rem;
+
+// Code blocks
+$code-background-color: #f8f9fa;
+$code-text-color: #e83e8c;
+
+// Custom styles
+.site-title {
+  color: $purple-700 !important;
+  font-weight: 700;
+}
+
+.site-header {
+  border-bottom: 2px solid $purple-200;
+}
+
+.side-bar {
+  background: linear-gradient(180deg, $purple-000 0%, #ffffff 100%);
+}
+
+.navigation-list-link.active {
+  background-color: $purple-100;
+  color: $purple-700;
+}
+
+// Feature cards
+.feature-card {
+  background: linear-gradient(135deg, $purple-100 0%, $blue-400 100%);
+  padding: 1.5rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  color: white;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+// Badges
+.badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 4px;
+  margin-right: 0.5rem;
+}
+
+.badge-purple {
+  background-color: $purple-100;
+  color: $purple-700;
+}
+
+.badge-blue {
+  background-color: #e3f2fd;
+  color: #1976d2;
+}
+
+.badge-green {
+  background-color: #e8f5e9;
+  color: #388e3c;
+}

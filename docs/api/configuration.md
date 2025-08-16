@@ -1,6 +1,8 @@
 ---
 layout: default
-title: Configuration Reference
+title: Configuration
+parent: API Reference
+nav_order: 2
 ---
 
 # Configuration Reference

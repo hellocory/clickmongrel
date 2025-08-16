@@ -1,8 +1,7 @@
-theme: jekyll-theme-minimal
+theme: jekyll-theme-cayman
 title: ClickMongrel MCP Server
 description: Seamless ClickUp integration for Claude AI - Task sync, time tracking, and project management
 show_downloads: true
-logo: /assets/logo.png
 
 plugins:
   - jekyll-relative-links

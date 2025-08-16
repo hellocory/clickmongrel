@@ -1,6 +1,8 @@
 ---
 layout: default
-title: MCP Tools Reference
+title: MCP Tools
+parent: API Reference
+nav_order: 1
 ---
 
 # MCP Tools Reference
