@@ -1,0 +1,273 @@
+import { ReportTask } from '../types/index.js';
+import TaskHandler from './tasks.js';
+import GoalHandler from './goals.js';
+import configManager from '../config/index.js';
+import logger from '../utils/logger.js';
+import * as fs from 'fs';
+import * as path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+export class ReportHandler {
+  private taskHandler: TaskHandler;
+  private goalHandler: GoalHandler;
+
+  constructor(apiKey: string) {
+    this.taskHandler = new TaskHandler(apiKey);
+    this.goalHandler = new GoalHandler(apiKey);
+  }
+
+  async generateReport(type: 'daily' | 'weekly'): Promise<string> {
+    try {
+      if (type === 'daily') {
+        return await this.generateDailyReport();
+      } else {
+        return await this.generateWeeklyReport();
+      }
+    } catch (error) {
+      logger.error(`Failed to generate ${type} report:`, error);
+      throw error;
+    }
+  }
+
+  private async generateDailyReport(): Promise<string> {
+    const today = new Date();
+    const dateStr: string = today.toISOString().split('T')[0]!;
+
+    // Get current goal
+    const currentGoal = await this.goalHandler.getCurrentGoal();
+    
+    // Get tasks
+    const tasks = await this.taskHandler.getTasks();
+    
+    // Categorize tasks
+    const completedTasks: ReportTask[] = [];
+    const inProgressTasks: ReportTask[] = [];
+    const tomorrowTasks: ReportTask[] = [];
+
+    for (const task of tasks) {
+      const reportTask: ReportTask = {
+        id: task.id,
+        title: task.name
+      };
+
+      if (task.status.status.toLowerCase().includes('done') || 
+          task.status.status.toLowerCase().includes('complete')) {
+        completedTasks.push(reportTask);
+      } else if (task.status.status.toLowerCase().includes('progress')) {
+        inProgressTasks.push(reportTask);
+      } else if (task.status.status.toLowerCase().includes('to do')) {
+        tomorrowTasks.push(reportTask);
+      }
+    }
+
+    // Generate report using template
+    const report = this.renderTemplate(this.loadTemplate('daily') || '', {
+      date: dateStr,
+      goal_title: currentGoal?.name || 'No active goal',
+      goal_id: currentGoal?.id || 'N/A',
+      goal_progress: currentGoal?.percent_completed || 0,
+      completed_tasks: completedTasks,
+      in_progress_tasks: inProgressTasks,
+      tomorrow_tasks: tomorrowTasks.slice(0, 5) // Limit to top 5
+    });
+
+    // Save report
+    const reportStr: string = report;
+    await this.saveReport('daily', dateStr, reportStr);
+
+    return report;
+  }
+
+  private async generateWeeklyReport(): Promise<string> {
+    const today = new Date();
+    const weekStart = new Date(today);
+    weekStart.setDate(today.getDate() - today.getDay()); // Start of week (Sunday)
+    
+    const dateStr: string = `${weekStart.toISOString().split('T')[0]!}_to_${today.toISOString().split('T')[0]!}`;
+
+    // Get current goal
+    const currentGoal = await this.goalHandler.getCurrentGoal();
+    
+    // Get all tasks
+    const tasks = await this.taskHandler.getTasks();
+    
+    // Calculate weekly metrics
+    const completedCount = tasks.filter(t => 
+      t.status.status.toLowerCase().includes('done') || 
+      t.status.status.toLowerCase().includes('complete')
+    ).length;
+    
+    const inProgressCount = tasks.filter(t => 
+      t.status.status.toLowerCase().includes('progress')
+    ).length;
+    
+    const totalCount = tasks.length;
+
+    // Generate report
+    const report = this.renderTemplate(this.loadTemplate('weekly') || '', {
+      week_start: weekStart.toISOString().split('T')[0],
+      week_end: today.toISOString().split('T')[0],
+      goal_title: currentGoal?.name || 'No active goal',
+      goal_id: currentGoal?.id || 'N/A',
+      goal_progress: currentGoal?.percent_completed || 0,
+      total_tasks: totalCount,
+      completed_tasks: completedCount,
+      in_progress_tasks: inProgressCount,
+      completion_rate: totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
+    });
+
+    // Save report
+    const reportStr: string = report;
+    await this.saveReport('weekly', dateStr, reportStr);
+
+    return report;
+  }
+
+  private loadTemplate(type: 'daily' | 'weekly'): string {
+    const defaultTemplates: Record<string, string> = {
+      daily: `# Daily Development Report - {{date}}
+
+## Goal Progress
+**Current Goal:** {{goal_title}} ({{goal_id}})
+**Progress:** {{goal_progress}}%
+
+## Tasks Completed Today
+{{#each completed_tasks}}
+- ✅ {{title}} ({{id}})
+{{/each}}
+{{#unless completed_tasks}}
+No tasks completed today.
+{{/unless}}
+
+## Tasks In Progress
+{{#each in_progress_tasks}}
+- 🔄 {{title}} ({{id}})
+{{/each}}
+{{#unless in_progress_tasks}}
+No tasks currently in progress.
+{{/unless}}
+
+## Tomorrow's Focus
+{{#each tomorrow_tasks}}
+- 📋 {{title}}
+{{/each}}
+{{#unless tomorrow_tasks}}
+No tasks scheduled for tomorrow.
+{{/unless}}
+
+---
+*Generated by ClickMongrel MCP Server*`,
+
+      weekly: `# Weekly Development Report
+**Period:** {{week_start}} to {{week_end}}
+
+## Goal Progress
+**Current Goal:** {{goal_title}} ({{goal_id}})
+**Weekly Progress:** {{goal_progress}}%
+
+## Weekly Summary
+- **Total Tasks:** {{total_tasks}}
+- **Completed:** {{completed_tasks}}
+- **In Progress:** {{in_progress_tasks}}
+- **Completion Rate:** {{completion_rate}}%
+
+## Key Achievements
+- Successfully managed {{completed_tasks}} tasks to completion
+- Maintained {{goal_progress}}% progress on current goal
+
+## Next Week Focus
+- Continue progress on in-progress tasks
+- Review and prioritize backlog items
+
+---
+*Generated by ClickMongrel MCP Server*`
+    };
+
+    // Try to load custom template
+    const templatePath = path.join(__dirname, `../../templates/${type}-report.md`);
+    if (fs.existsSync(templatePath)) {
+      try {
+        return fs.readFileSync(templatePath, 'utf-8');
+      } catch (error) {
+        logger.warn(`Failed to load custom template, using default: ${error}`);
+      }
+    }
+
+    return defaultTemplates[type] || '';
+  }
+
+  private renderTemplate(template: string, data: any): string {
+    // Simple template rendering (replace with proper template engine if needed)
+    let rendered = template;
+
+    // Replace simple variables
+    Object.keys(data).forEach(key => {
+      if (typeof data[key] !== 'object') {
+        const regex = new RegExp(`{{${key}}}`, 'g');
+        rendered = rendered.replace(regex, String(data[key]));
+      }
+    });
+
+    // Handle arrays (simplified)
+    Object.keys(data).forEach(key => {
+      if (Array.isArray(data[key])) {
+        const items = data[key] as any[];
+        
+        // Handle {{#each key}} ... {{/each}}
+        const eachRegex = new RegExp(`{{#each ${key}}}([\\s\\S]*?){{/each}}`, 'g');
+        rendered = rendered.replace(eachRegex, (_match, content) => {
+          if (items.length === 0) return '';
+          return items.map(item => {
+            let itemContent = content;
+            Object.keys(item).forEach(prop => {
+              itemContent = itemContent.replace(new RegExp(`{{${prop}}}`, 'g'), item[prop]);
+            });
+            return itemContent;
+          }).join('');
+        });
+
+        // Handle {{#unless key}} ... {{/unless}}
+        const unlessRegex = new RegExp(`{{#unless ${key}}}([\\s\\S]*?){{/unless}}`, 'g');
+        rendered = rendered.replace(unlessRegex, (_match, content) => {
+          return items.length === 0 ? content : '';
+        });
+      }
+    });
+
+    return rendered;
+  }
+
+  private async saveReport(type: 'daily' | 'weekly', identifier: string, content: string): Promise<void> {
+    const reportsDir = path.join(__dirname, `../../reports/${type}`);
+    
+    // Ensure directory exists
+    if (!fs.existsSync(reportsDir)) {
+      fs.mkdirSync(reportsDir, { recursive: true });
+    }
+
+    const filename = `${identifier}.md`;
+    const filepath = path.join(reportsDir, filename);
+    
+    fs.writeFileSync(filepath, content);
+    logger.info(`Saved ${type} report to: ${filepath}`);
+  }
+
+  async scheduleReports(): Promise<void> {
+    const config = configManager.getConfig();
+
+    if (config.reports.daily.enabled) {
+      // Schedule daily report
+      logger.info(`Daily reports scheduled for ${config.reports.daily.time}`);
+    }
+
+    if (config.reports.weekly.enabled) {
+      // Schedule weekly report
+      logger.info(`Weekly reports scheduled for ${config.reports.weekly.day} at ${config.reports.weekly.time}`);
+    }
+  }
+}
+
+export default ReportHandler;

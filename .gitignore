@@ -1,0 +1,32 @@
+node_modules/
+dist/
+*.log
+.env
+.env.local
+.claude/
+CLAUDE.md
+test/
+*.test.js
+*-test.js
+test-*.js
+init-*.js
+setup-*.js
+
+# API keys and sensitive data
+**/config.json
+**/mcp-env.json
+**/*api-key*
+**/*API_KEY*
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+*.cache
