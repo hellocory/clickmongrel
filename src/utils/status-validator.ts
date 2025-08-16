@@ -5,33 +5,30 @@ import chalk from 'chalk';
 export class StatusValidator {
   private api: ClickUpAPI;
   
-  // Required statuses for Tasks list
+  // Required statuses for Tasks list (as shown in ClickUp)
   private static readonly REQUIRED_TASK_STATUSES = [
     'to do',
-    'in progress', 
+    'future',
+    'in progress',
+    'fixing',
     'completed'
   ];
   
   // Optional but recommended statuses for Tasks list
-  private static readonly RECOMMENDED_TASK_STATUSES = [
-    'future',
-    'fixing'
-  ];
+  private static readonly RECOMMENDED_TASK_STATUSES: string[] = [];
   
-  // Required statuses for Commits list
+  // Required statuses for Commits list (as shown in ClickUp)
   private static readonly REQUIRED_COMMIT_STATUSES = [
-    'development update',
-    'development push',
-    'merged'
+    'comitted',
+    'developing',
+    'prototyping',
+    'rejected',
+    'production/testing',
+    'production/final'
   ];
   
   // Optional but recommended statuses for Commits list
-  private static readonly RECOMMENDED_COMMIT_STATUSES = [
-    'upstream merge',
-    'production/testing',
-    'production/staging', 
-    'production/final'
-  ];
+  private static readonly RECOMMENDED_COMMIT_STATUSES: string[] = [];
 
   constructor(apiKey: string) {
     this.api = new ClickUpAPI(apiKey);

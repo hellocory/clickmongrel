@@ -126,9 +126,9 @@ export class SyncHandler {
           }
         },
         status_mappings: {
-          pending: statuses.find(s => s.status.toLowerCase().includes('to do'))?.status || 'to do',
-          in_progress: statuses.find(s => s.status.toLowerCase().includes('progress'))?.status || 'in progress',
-          completed: statuses.find(s => s.status.toLowerCase().includes('done') || s.status.toLowerCase().includes('complete'))?.status || 'done'
+          pending: statuses.find(s => s.status.toLowerCase() === 'to do')?.status || 'to do',
+          in_progress: statuses.find(s => s.status.toLowerCase() === 'in progress')?.status || 'in progress',
+          completed: statuses.find(s => s.status.toLowerCase() === 'completed')?.status || 'completed'
         }
       };
       
@@ -434,7 +434,10 @@ export class SyncHandler {
       // Map ClickUp status to todo status
       const statusMap: Record<string, TodoItem['status']> = {
         'to do': 'pending',
+        'future': 'pending',
         'in progress': 'in_progress',
+        'fixing': 'in_progress',
+        'completed': 'completed',
         'done': 'completed',
         'complete': 'completed',
         'closed': 'completed'
