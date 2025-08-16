@@ -339,6 +339,21 @@ export class SyncHandler {
       description,
       status: { status } as any
     };
+    
+    // If this todo has a parent, find the parent task ID
+    if (todo.parent_id) {
+      // Get existing tasks to find the parent
+      const existingTasks = await this.api.getTasks(this.listId!);
+      const parentTask = existingTasks.find(t => 
+        t.custom_fields?.find(f => f.name === 'todo_id')?.value === todo.parent_id ||
+        t.name === todo.parent_id
+      );
+      
+      if (parentTask) {
+        taskData.parent = parentTask.id;
+        logger.info(`Setting parent task ${parentTask.id} for subtask ${todo.content}`);
+      }
+    }
 
     // Add time estimate if available (keep in milliseconds as ClickUp expects)
     if (todo.estimated_time) {
@@ -420,11 +435,41 @@ export class SyncHandler {
     if (currentStatus !== newStatus) {
       await this.api.updateTaskStatus(task.id, newStatus);
       logger.info(`Updated task ${task.id} status from ${currentStatus} to ${newStatus}`);
+      
+      // If this task was completed and has a parent, check if we need to complete the parent
+      if (todo.status === 'completed' && task.parent) {
+        await this.checkAndCompleteParentTask(task.parent);
+      }
     }
 
     // Update mapping
     this.taskIdMap.set(todo.id, task.id);
     todo.clickup_task_id = task.id;
+  }
+  
+  private async checkAndCompleteParentTask(parentTaskId: string): Promise<void> {
+    try {
+      // Get the parent task
+      const parentTask = await this.api.getTask(parentTaskId);
+      
+      // Get all subtasks of this parent
+      const allTasks = await this.api.getTasks(this.listId!);
+      const subtasks = allTasks.filter(t => t.parent === parentTaskId);
+      
+      // Check if all subtasks are completed
+      const allSubtasksCompleted = subtasks.every(t => 
+        t.status.status.toLowerCase() === 'completed'
+      );
+      
+      if (allSubtasksCompleted && parentTask.status.status.toLowerCase() !== 'completed') {
+        // Complete the parent task
+        await this.api.updateTaskStatus(parentTaskId, 'completed');
+        
+        logger.info(`✅ Auto-completed parent task ${parentTaskId} (${parentTask.name}) - all subtasks done!`);
+      }
+    } catch (error) {
+      logger.error(`Failed to check/complete parent task ${parentTaskId}:`, error);
+    }
   }
 
   async syncTaskToTodo(taskId: string): Promise<TodoItem | null> {

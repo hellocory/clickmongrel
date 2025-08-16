@@ -183,12 +183,13 @@ export class ClickUpAPI {
       time_estimate: task.time_estimate,
       assignees: task.assignees, // Already an array of IDs from sync handler
       tags: task.tags, // Added tags!
-      custom_fields: task.custom_fields
+      custom_fields: task.custom_fields,
+      parent: task.parent // Add parent task ID for subtasks
     });
     
     const newTask = response.data;
     cache.setTask(newTask);
-    logger.info(`Created task: ${newTask.id} - ${newTask.name}`);
+    logger.info(`Created task: ${newTask.id} - ${newTask.name}${task.parent ? ` (subtask of ${task.parent})` : ''}`);
     return newTask;
   }
 

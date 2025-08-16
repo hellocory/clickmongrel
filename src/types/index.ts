@@ -10,6 +10,8 @@ export interface ClickUpTask {
   time_estimate?: number;
   tags?: ClickUpTag[];
   custom_fields?: ClickUpCustomField[];
+  parent?: string; // Parent task ID for subtasks
+  subtasks?: string[]; // Array of subtask IDs
   list: {
     id: string;
     name: string;
@@ -163,6 +165,7 @@ export interface TodoItem {
   status: 'pending' | 'in_progress' | 'completed';
   clickup_task_id?: string;
   clickup_status_id?: string;
+  parent_id?: string; // Parent todo ID for subtasks
   // Time tracking
   created_at?: string;
   started_at?: string;
