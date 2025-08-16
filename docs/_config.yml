@@ -1,0 +1,44 @@
+theme: jekyll-theme-minimal
+title: ClickMongrel MCP Server
+description: Seamless ClickUp integration for Claude AI - Task sync, time tracking, and project management
+show_downloads: true
+logo: /assets/logo.png
+
+plugins:
+  - jekyll-relative-links
+  - jekyll-seo-tag
+  - jekyll-sitemap
+
+relative_links:
+  enabled: true
+  collections: true
+
+include:
+  - README.md
+  - CHANGELOG.md
+  - LICENSE
+  - docs/
+
+exclude:
+  - node_modules/
+  - src/
+  - dist/
+  - test/
+  - .claude/
+  - package.json
+  - tsconfig.json
+  - .env*
+
+navigation:
+  - title: Home
+    url: /
+  - title: Quick Setup
+    url: /QUICK_SETUP
+  - title: Manual Setup
+    url: /MANUAL_SETUP
+  - title: Security
+    url: /SECURITY
+  - title: Changelog
+    url: /CHANGELOG
+  - title: License
+    url: /LICENSE
