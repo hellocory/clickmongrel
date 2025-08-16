@@ -110,6 +110,12 @@ export class ClickUpAPI {
     return lists;
   }
 
+  async createList(spaceId: string, list: any): Promise<ClickUpList> {
+    const response = await this.client.post(`/space/${spaceId}/list`, list);
+    logger.info(`Created list: ${response.data.name}`);
+    return response.data;
+  }
+
   async getList(listId: string): Promise<ClickUpList> {
     const cached = cache.getList(listId);
     if (cached) return cached;

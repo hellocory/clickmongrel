@@ -1,7 +1,8 @@
-import { TodoItem, ClickUpTask } from '../types/index.js';
+import { TodoItem, ClickUpTask, CommitInfo } from '../types/index.js';
 import ClickUpAPI from '../utils/clickup-api.js';
 import SyncHandler from './sync.js';
 import GoalHandler from './goals.js';
+import CommitHandler from './commits.js';
 import configManager from '../config/index.js';
 import logger from '../utils/logger.js';
 import { execSync } from 'child_process';
@@ -33,6 +34,7 @@ export class PlanHandler {
   private api: ClickUpAPI;
   private syncHandler: SyncHandler;
   private goalHandler: GoalHandler;
+  private commitHandler: CommitHandler;
   private activePlans: Map<string, Plan>;
   private listId: string | undefined;
 
@@ -40,6 +42,7 @@ export class PlanHandler {
     this.api = new ClickUpAPI(apiKey);
     this.syncHandler = new SyncHandler(apiKey);
     this.goalHandler = new GoalHandler(apiKey);
+    this.commitHandler = new CommitHandler(apiKey);
     this.activePlans = new Map();
   }
 
@@ -198,8 +201,17 @@ export class PlanHandler {
         const commit = await this.createCommit(item, commitMessage);
         item.commit = commit;
         
-        // 3. Link the commit to the task
-        await this.linkCommitToTask(item.taskId, commit);
+        // 3. Track commit in ClickUp Commits list and link to task
+        if (commit) {
+          const commitInfo: CommitInfo = {
+            hash: commit.hash,
+            message: commit.message,
+            author: 'Claude AI',
+            timestamp: commit.timestamp,
+            task_id: item.taskId
+          };
+          await this.commitHandler.linkCommit(commitInfo);
+        }
       }
       
       // 4. Update goal progress
@@ -250,20 +262,6 @@ Task ID: ${item.taskId}
     }
   }
 
-  /**
-   * Link a commit to a ClickUp task via comment
-   */
-  private async linkCommitToTask(taskId: string, commit: any): Promise<void> {
-    if (!commit) return;
-    
-    try {
-      const comment = `🔗 **Commit:** \`${commit.hash.substring(0, 8)}\`\n\n${commit.message}`;
-      await this.api.addTaskComment(taskId, comment);
-      logger.info(`Linked commit ${commit.hash} to task ${taskId}`);
-    } catch (error) {
-      logger.warn('Failed to link commit to task:', error);
-    }
-  }
 
   /**
    * Update the goal task progress based on completed subtasks
@@ -311,7 +309,14 @@ Task ID: ${item.taskId}
         );
         
         if (finalCommit) {
-          await this.linkCommitToTask(plan.goalId, finalCommit);
+          const commitInfo: CommitInfo = {
+            hash: finalCommit.hash,
+            message: finalCommit.message,
+            author: 'Claude AI',
+            timestamp: finalCommit.timestamp,
+            task_id: plan.goalId
+          };
+          await this.commitHandler.linkCommit(commitInfo);
         }
       }
       
