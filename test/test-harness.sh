@@ -235,26 +235,53 @@ run_claude_setup() {
     
     # Create Claude command script
     cat > claude-setup.txt << EOF
-Please perform the following test setup:
+Please perform the following comprehensive test of the task-commit flow:
 
 1. Initialize ClickUp with workspace "$CLICKUP_WORKSPACE"
    (The MCP tool will handle all the setup automatically)
 
 2. Create a test goal called "ClickMongrel Integration Test Run"
 
-3. Create a test todo list:
-   - Test parent task
-     - Test subtask 1
-     - Test subtask 2
-   - Test standalone task
+3. Create this specific todo structure using TodoWrite:
+   - id: "main-feature", content: "Implement user authentication", status: "pending"
+   - id: "task-1", content: "Create login form", status: "pending" 
+   - id: "task-2", content: "Add password validation", status: "pending"
+   - id: "task-3", content: "Implement JWT tokens", status: "pending"
+   - id: "bug-fix", content: "Fix memory leak in dashboard", status: "pending"
 
-4. Sync the todos to ClickUp
+4. Sync the todos to ClickUp using the sync_todos MCP tool
 
-5. Complete the first subtask and create a commit: "test: Validate subtask completion"
+5. Complete task-1 and create a commit:
+   - Mark "task-1" as completed in TodoWrite
+   - Run: git commit -m "feat: Create login form component"
+   - The commit should automatically check off task-1 in ClickUp
 
-6. Generate a status report
+6. Complete task-2 and create another commit:
+   - Mark "task-2" as completed in TodoWrite  
+   - Run: git commit -m "feat: Add password validation logic"
+   - The commit should automatically check off task-2 in ClickUp
 
-Output "SETUP_COMPLETE" when done.
+7. Complete task-3 and create final commit:
+   - Mark "task-3" as completed in TodoWrite
+   - Run: git commit -m "feat: Implement JWT token authentication"
+   - This should check off task-3 AND complete the parent "main-feature" task
+
+8. Fix the bug with a separate commit:
+   - Mark "bug-fix" as completed in TodoWrite
+   - Run: git commit -m "fix: Resolve memory leak in dashboard component"
+
+9. Generate a status report showing:
+   - All tasks completed
+   - Commits linked to tasks
+   - Parent task auto-completed when all subtasks done
+
+10. Verify in ClickUp that:
+    - All individual tasks show as completed
+    - The parent task "Implement user authentication" is completed
+    - Each commit appears in the Commits list with proper status
+    - Commits are linked to their respective tasks
+
+Output "SETUP_COMPLETE" when all tests pass.
 EOF
     
     # Copy to logs directory
@@ -263,14 +290,22 @@ EOF
     # Log user actions expected
     cat >> "$USER_LOG" << EOF
 Expected User Actions:
-1. Open Claude Code in test directory
-2. Execute: Initialize ClickUp with workspace "$CLICKUP_WORKSPACE"
-3. Execute: Create goal "ClickMongrel Integration Test Run"
-4. Execute: Create todo list with test tasks
-5. Execute: Sync todos to ClickUp
-6. Execute: Complete first subtask
-7. Execute: Create commit
-8. Execute: Generate status report
+1. Open Claude Code in test directory: cd $TEST_PROJECT && claude
+2. Initialize ClickUp with workspace "$CLICKUP_WORKSPACE"
+3. Create goal "ClickMongrel Integration Test Run"
+4. Create todo list with authentication tasks using TodoWrite
+5. Sync todos to ClickUp using sync_todos MCP tool
+6. Complete task-1 and commit "feat: Create login form component"
+7. Complete task-2 and commit "feat: Add password validation logic"
+8. Complete task-3 and commit "feat: Implement JWT token authentication"
+   - This should auto-complete the parent task
+9. Complete bug-fix and commit "fix: Resolve memory leak in dashboard component"
+10. Generate status report
+11. Verify in ClickUp:
+    - All tasks show as completed
+    - Parent task auto-completed when subtasks done
+    - Commits appear in Commits list with correct statuses
+    - Commits are linked to their tasks
 EOF
     
     log "Claude setup script created at: claude-setup.txt"
@@ -327,6 +362,84 @@ validate_setup() {
         return 1
     else
         success "All validations passed"
+        return 0
+    fi
+}
+
+validate_task_commit_flow() {
+    header "Validating Task-Commit Flow Results"
+    
+    cd "$TEST_PROJECT"
+    
+    local valid=1
+    
+    # Check git commits were created
+    log "Checking git commits..."
+    local commit_count=$(git log --oneline 2>/dev/null | wc -l)
+    if [ $commit_count -gt 1 ]; then
+        success "Found $commit_count commits"
+        git log --oneline --graph -10 2>/dev/null | while read line; do
+            log "  $line"
+        done
+    else
+        error "Not enough commits found (expected at least 4)"
+        valid=0
+    fi
+    
+    # Check for specific commit messages
+    if git log --oneline | grep -q "Create login form"; then
+        success "Found login form commit"
+    else
+        error "Missing login form commit"
+        valid=0
+    fi
+    
+    if git log --oneline | grep -q "password validation"; then
+        success "Found password validation commit"
+    else
+        error "Missing password validation commit"
+        valid=0
+    fi
+    
+    if git log --oneline | grep -q "JWT token"; then
+        success "Found JWT token commit"
+    else
+        error "Missing JWT token commit"
+        valid=0
+    fi
+    
+    if git log --oneline | grep -q "memory leak"; then
+        success "Found memory leak fix commit"
+    else
+        error "Missing memory leak fix commit"
+        valid=0
+    fi
+    
+    # Check for sync status file
+    if [ -f ".claude/clickup/cache/sync-status.json" ]; then
+        success "Sync status file exists"
+        local sync_data=$(cat .claude/clickup/cache/sync-status.json 2>/dev/null)
+        if echo "$sync_data" | grep -q "completed"; then
+            success "Found completed tasks in sync status"
+        else
+            warning "No completed tasks found in sync status"
+        fi
+    else
+        warning "Sync status file missing"
+    fi
+    
+    # Check for reports
+    if ls .claude/clickup/reports/*.md 2>/dev/null | head -1; then
+        success "Found generated reports"
+    else
+        warning "No reports generated"
+    fi
+    
+    if [ $valid -eq 0 ]; then
+        error "Task-commit flow validation failed"
+        return 1
+    else
+        success "Task-commit flow validation passed"
         return 0
     fi
 }
@@ -490,7 +603,12 @@ $(ls -lh "$LOGS_DIR/" 2>/dev/null)
 \`\`\`
 
 ## Validation Results
-$(validate_setup 2>&1 || echo "Validation not completed")
+
+### Setup Validation
+$(validate_setup 2>&1 || echo "Setup validation not completed")
+
+### Task-Commit Flow Validation  
+$(validate_task_commit_flow 2>&1 || echo "Task-commit flow validation not completed")
 
 ## Summary
 \`\`\`
@@ -546,6 +664,7 @@ main() {
     
     # Validate and collect results
     validate_setup
+    validate_task_commit_flow
     collect_results
     generate_report
     
