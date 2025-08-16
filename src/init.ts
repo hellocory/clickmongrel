@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import inquirer from 'inquirer';
+import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 import chalk from 'chalk';
@@ -37,6 +38,11 @@ async function init() {
     
     const user = await api.getCurrentUser();
     console.log(chalk.green(`✓ Connected as: ${user.username} (${user.email})`));
+
+    // Step 2.5: Enable auto-assignment by default for connected user
+    const enableAutoAssign = true;
+    const assigneeUserId = user.id;
+    console.log(chalk.green(`✓ Auto-assignment enabled for user: ${user.username} (${user.email})`));
 
     // Step 3: Get teams/workspaces
     console.log(chalk.yellow('Fetching workspaces...'));
@@ -175,7 +181,9 @@ async function init() {
         api_key: apiKey!,
         workspace_id: selectedTeam.id,
         default_space: selectedSpace.name,
-        default_list: selectedList.name
+        default_list: selectedList.name,
+        auto_assign_user: enableAutoAssign,
+        assignee_user_id: assigneeUserId
       },
       sync: {
         enabled: true,
@@ -201,6 +209,13 @@ async function init() {
           time: '17:00',
           auto_submit: false
         }
+      },
+      templates: {
+        task_creation: 'task_creation.md',
+        subtask_creation: 'subtask_creation.md',
+        future_tasks: 'future_tasks.md',
+        daily_report: 'daily_report.md',
+        weekly_report: 'weekly_report.md'
       },
       hooks: {
         todo_write: true,
@@ -231,7 +246,37 @@ async function init() {
 
     console.log(chalk.green('✓ Configuration saved'));
 
-    // Step 11: Setup instructions
+    // Step 11: Create templates folder and files
+    console.log(chalk.yellow('\nCreating templates folder...'));
+    const templatesDir = path.join(__dirname, '../templates');
+    
+    if (!fs.existsSync(templatesDir)) {
+      fs.mkdirSync(templatesDir, { recursive: true });
+    }
+
+    // Create template files with default content
+    const templateFiles = [
+      { name: 'task_creation.md', content: configManager.loadTemplate('task_creation') },
+      { name: 'subtask_creation.md', content: configManager.loadTemplate('subtask_creation') },
+      { name: 'future_tasks.md', content: configManager.loadTemplate('future_tasks') },
+      { name: 'daily_report.md', content: configManager.loadTemplate('daily_report') },
+      { name: 'weekly_report.md', content: configManager.loadTemplate('weekly_report') },
+      { name: 'README.md', content: getTemplateDocumentation() }
+    ];
+
+    for (const template of templateFiles) {
+      const templatePath = path.join(templatesDir, template.name);
+      if (!fs.existsSync(templatePath)) {
+        fs.writeFileSync(templatePath, template.content);
+        console.log(chalk.green(`  ✓ Created template: ${template.name}`));
+      } else {
+        console.log(chalk.yellow(`  ~ Template exists: ${template.name}`));
+      }
+    }
+
+    console.log(chalk.green('✓ Templates folder configured'));
+
+    // Step 12: Setup instructions
     console.log(chalk.cyan.bold('\n📋 Setup Complete!\n'));
     console.log('To start using ClickMongrel with Claude Code:\n');
     console.log(chalk.white('1. Build the project:'));
@@ -249,6 +294,263 @@ async function init() {
     console.error(chalk.red('\n❌ Initialization failed:'), error);
     process.exit(1);
   }
+}
+
+function getTemplateDocumentation(): string {
+  return `# ClickMongrel Templates Documentation
+
+## Overview
+
+ClickMongrel uses customizable templates to format task descriptions, reports, and other content sent to ClickUp. Templates use a simple variable substitution system with \`{{variable_name}}\` placeholders.
+
+## Available Templates
+
+### 1. task_creation.md
+Used when creating new tasks from TodoWrite items.
+
+**Available Variables:**
+- \`{{title}}\` - Parsed task title
+- \`{{description}}\` - Original todo content
+- \`{{category}}\` - Auto-detected category (feature, fix, enhancement, etc.)
+- \`{{priority}}\` - Task priority (urgent, high, normal, low)
+- \`{{estimated_time}}\` - Human-readable time estimate (e.g., "30 minutes")
+- \`{{tags}}\` - Comma-separated list of auto-generated tags
+- \`{{created_at}}\` - Formatted creation timestamp
+- \`{{todo_id}}\` - Unique TodoWrite identifier
+
+### 2. subtask_creation.md
+Used for creating subtasks (currently same variables as task_creation).
+
+**Additional Variables:**
+- \`{{parent_id}}\` - Parent task ID
+- \`{{goal_title}}\` - Associated goal name
+
+### 3. future_tasks.md
+Used for planning future tasks or backlog items.
+
+**Available Variables:**
+- \`{{title}}\` - Task title
+- \`{{description}}\` - Task description
+- \`{{planned_start}}\` - Estimated start date
+- \`{{estimated_time}}\` - Duration estimate
+- \`{{priority}}\` - Priority level
+- \`{{dependencies}}\` - Task dependencies
+- \`{{category}}\` - Task category
+- \`{{tags}}\` - Associated tags
+- \`{{notes}}\` - Additional notes
+- \`{{todo_id}}\` - Unique identifier
+
+### 4. daily_report.md
+Template for generating daily progress reports.
+
+**Available Variables:**
+- \`{{date}}\` - Report date
+- \`{{goal_title}}\` - Current goal name
+- \`{{goal_progress}}\` - Goal completion percentage
+- \`{{completed_tasks}}\` - Array of completed tasks
+- \`{{in_progress_tasks}}\` - Array of active tasks
+- \`{{tomorrow_tasks}}\` - Array of planned tasks
+- \`{{notes}}\` - Additional notes
+
+**Array Variables (use with loops):**
+Each task in arrays contains:
+- \`{{title}}\` - Task name
+- \`{{time_tracked}}\` - Time spent
+- \`{{commits}}\` - Related git commits
+- \`{{progress}}\` - Completion percentage
+- \`{{blockers}}\` - Identified blockers
+
+### 5. weekly_report.md
+Template for weekly summary reports.
+
+**Available Variables:**
+- \`{{week_start}}\` - Week starting date
+- \`{{goal_title}}\` - Current goal
+- \`{{goal_progress}}\` - Overall goal progress
+- \`{{week_progress}}\` - This week's progress
+- \`{{completed_tasks}}\` - Completed work
+- \`{{in_progress_tasks}}\` - Active work
+- \`{{commits}}\` - All commits this week
+- \`{{next_week_tasks}}\` - Planned work
+- \`{{blockers}}\` - Current challenges
+- \`{{notes}}\` - Summary notes
+
+## Template Syntax
+
+### Basic Variables
+\`\`\`markdown
+# {{title}}
+
+**Priority**: {{priority}}
+**Category**: {{category}}
+**Created**: {{created_at}}
+\`\`\`
+
+### Conditional Content
+While not implemented yet, you can use conditional logic in templates:
+
+\`\`\`markdown
+{{#if priority_urgent}}
+🔥 **URGENT TASK**
+{{/if}}
+
+{{#unless tags_empty}}
+**Tags**: {{tags}}
+{{/unless}}
+\`\`\`
+
+### Array Loops (Future Enhancement)
+\`\`\`markdown
+## Completed Tasks
+{{#each completed_tasks}}
+- {{title}} ({{time_tracked}})
+  {{#each commits}}
+  - Commit: {{.}}
+  {{/each}}
+{{/each}}
+\`\`\`
+
+## Smart Task Analysis
+
+ClickMongrel automatically analyzes your TodoWrite content to extract:
+
+### Categories
+- **feature** - New functionality
+- **fix** - Bug fixes
+- **enhancement** - Improvements
+- **refactor** - Code restructuring
+- **test** - Testing work
+- **docs** - Documentation
+- **style** - Styling/formatting
+- **chore** - Maintenance tasks
+
+### Tags
+Auto-generated based on content analysis:
+- Technology tags (react, typescript, api, etc.)
+- Action tags (implement, update, debug, etc.)
+- Priority tags (urgent, important, etc.)
+
+### Time Estimation
+Intelligent parsing of time references:
+- "30 minutes", "2 hours", "half day"
+- "quick fix", "major refactor"
+- Auto-estimation based on task complexity
+
+### Priority Detection
+Automatic priority assignment:
+- **urgent** - Critical issues, production bugs
+- **high** - Important features, user-facing issues
+- **normal** - Standard development tasks
+- **low** - Nice-to-have improvements
+
+## Customization Guide
+
+### 1. Edit Templates
+Simply modify the \`.md\` files in this directory. Changes take effect immediately.
+
+### 2. Add Custom Variables
+To add custom variables, modify:
+- \`src/handlers/sync.ts\` - \`buildTaskDescription()\` method
+- Add your variable to the \`templateVars\` object
+
+### 3. Advanced Formatting
+For complex formatting, modify the template engine in:
+- \`src/config/index.ts\` - \`loadTemplate()\` and \`getDefaultTemplate()\` methods
+
+### 4. Custom Analyzers
+Enhance task analysis in:
+- \`src/utils/task-analyzer.ts\` - Add new analysis functions
+
+## Examples
+
+### Enhanced Task Template
+\`\`\`markdown
+# 🎯 {{title}}
+
+## Description
+{{description}}
+
+## Project Details
+- **🏷️ Category**: {{category}}
+- **⚡ Priority**: {{priority}}
+- **⏱️ Estimate**: {{estimated_time}}
+- **🏷️ Tags**: {{tags}}
+
+## Timeline
+- **📅 Created**: {{created_at}}
+- **🎯 Due**: {{due_date}}
+
+## Technical Notes
+\`\`\`
+
+### Rich Report Template
+\`\`\`markdown
+# 📊 Daily Progress - {{date}}
+
+## 🎯 Goal: {{goal_title}}
+**Progress**: {{goal_progress}}% complete
+
+## ✅ Completed Today
+{{#each completed_tasks}}
+### {{title}}
+- **Time**: {{time_tracked}}
+- **Category**: {{category}}
+{{#if commits}}
+- **Commits**: {{commits}}
+{{/if}}
+{{/each}}
+
+## 🔄 In Progress
+{{#each in_progress_tasks}}
+- {{title}} ({{progress}}%)
+{{/each}}
+
+## 📅 Tomorrow's Focus
+{{#each tomorrow_tasks}}
+- [ ] {{title}}
+{{/each}}
+
+---
+Generated by ClickMongrel v1.0
+\`\`\`
+
+## Best Practices
+
+1. **Keep templates focused** - Each template should serve a specific purpose
+2. **Use consistent formatting** - Maintain visual consistency across templates
+3. **Include essential metadata** - Priority, category, time estimates help with planning
+4. **Leverage emojis sparingly** - Use them for visual hierarchy, not decoration
+5. **Test your changes** - Verify templates render correctly in ClickUp
+6. **Version control** - Keep templates in git for team consistency
+
+## Troubleshooting
+
+### Variables Not Substituting
+- Check variable name spelling: \`{{title}}\` not \`{{Title}}\`
+- Ensure variable exists in the template context
+- Check for extra spaces: \`{{ title }}\` should be \`{{title}}\`
+
+### Template Not Loading
+- Verify file path and permissions
+- Check template syntax for errors
+- Review logs for specific error messages
+
+### Formatting Issues
+- Test templates in a markdown preview
+- Remember ClickUp has its own markdown parser
+- Some markdown features may not be supported
+
+## Need Help?
+
+- Check the main project documentation
+- Review example templates in this directory
+- Look at the source code in \`src/handlers/sync.ts\`
+- Create an issue on GitHub for bugs or feature requests
+
+---
+
+Last updated: Generated during ClickMongrel initialization
+`;
 }
 
 // Run if called directly

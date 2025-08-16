@@ -227,6 +227,39 @@ export class SyncHandler {
   }
 
   private buildTaskDescription(todo: TodoItem): string {
+    try {
+      // Load template based on task type - for now, always use task_creation
+      // Future enhancement: detect subtasks vs main tasks vs future tasks
+      const template = configManager.loadTemplate('task_creation');
+      
+      // Prepare template variables
+      const templateVars = {
+        title: todo.title || todo.content,
+        description: todo.content || '',
+        category: todo.category || 'general',
+        priority: todo.priority || 'normal',
+        estimated_time: todo.estimated_time ? TaskAnalyzer.formatDuration(todo.estimated_time) : 'Not specified',
+        tags: todo.tags ? todo.tags.join(', ') : 'None',
+        created_at: todo.created_at ? new Date(todo.created_at).toLocaleString() : new Date().toLocaleString(),
+        todo_id: todo.id
+      };
+      
+      // Simple template substitution (basic implementation)
+      let description = template;
+      Object.entries(templateVars).forEach(([key, value]) => {
+        const placeholder = `{{${key}}}`;
+        description = description.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), value.toString());
+      });
+      
+      return description;
+    } catch (error) {
+      logger.error('Error building task description with template:', error);
+      // Fallback to original implementation
+      return this.buildTaskDescriptionFallback(todo);
+    }
+  }
+
+  private buildTaskDescriptionFallback(todo: TodoItem): string {
     const sections: string[] = [];
     
     // Header
@@ -314,6 +347,14 @@ export class SyncHandler {
       taskData.due_date = dueDate.getTime();
     }
     
+    // Add assignee if auto-assignment is enabled
+    if (configManager.shouldAutoAssignUser()) {
+      const assigneeId = configManager.getAssigneeUserId();
+      if (assigneeId) {
+        taskData.assignees = [assigneeId];
+      }
+    }
+
     // Add custom field if available (preferred method)
     if (this.todoIdFieldId) {
       taskData.custom_fields = [

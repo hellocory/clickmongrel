@@ -29,7 +29,9 @@ export class ConfigManager {
         api_key: process.env.CLICKUP_API_KEY || '',
         workspace_id: process.env.CLICKUP_WORKSPACE_ID,
         default_space: process.env.CLICKUP_DEFAULT_SPACE || 'Ghost Codes Workspace',
-        default_list: process.env.CLICKUP_DEFAULT_LIST || 'Development Tasks'
+        default_list: process.env.CLICKUP_DEFAULT_LIST || 'Development Tasks',
+        auto_assign_user: process.env.CLICKUP_AUTO_ASSIGN === 'true',
+        assignee_user_id: process.env.CLICKUP_ASSIGNEE_USER_ID ? parseInt(process.env.CLICKUP_ASSIGNEE_USER_ID) : undefined
       },
       sync: {
         enabled: process.env.ENABLE_TODO_SYNC === 'true',
@@ -55,6 +57,13 @@ export class ConfigManager {
           time: '17:00',
           auto_submit: false
         }
+      },
+      templates: {
+        task_creation: 'task_creation.md',
+        subtask_creation: 'subtask_creation.md',
+        future_tasks: 'future_tasks.md',
+        daily_report: 'daily_report.md',
+        weekly_report: 'weekly_report.md'
       },
       hooks: {
         todo_write: true,
@@ -157,6 +166,165 @@ export class ConfigManager {
         return this.config.goals.track_progress;
       default:
         return false;
+    }
+  }
+
+  shouldAutoAssignUser(): boolean {
+    return this.config.clickup.auto_assign_user === true;
+  }
+
+  getAssigneeUserId(): number | undefined {
+    return this.config.clickup.assignee_user_id;
+  }
+
+  updateAssigneeConfig(enable: boolean, userId?: number): void {
+    this.config.clickup.auto_assign_user = enable;
+    if (userId !== undefined) {
+      this.config.clickup.assignee_user_id = userId;
+    }
+    this.saveConfig(this.config);
+  }
+
+  getTemplatePath(templateType: 'task_creation' | 'subtask_creation' | 'future_tasks' | 'daily_report' | 'weekly_report'): string {
+    const templateName = this.config.templates[templateType];
+    return path.join(__dirname, '../../templates', templateName);
+  }
+
+  loadTemplate(templateType: 'task_creation' | 'subtask_creation' | 'future_tasks' | 'daily_report' | 'weekly_report'): string {
+    const templatePath = this.getTemplatePath(templateType);
+    try {
+      if (fs.existsSync(templatePath)) {
+        return fs.readFileSync(templatePath, 'utf-8');
+      }
+    } catch (error) {
+      console.error(`Error loading template ${templateType}:`, error);
+    }
+    return this.getDefaultTemplate(templateType);
+  }
+
+  private getDefaultTemplate(templateType: 'task_creation' | 'subtask_creation' | 'future_tasks' | 'daily_report' | 'weekly_report'): string {
+    switch (templateType) {
+      case 'task_creation':
+        return `# {{title}}
+
+{{description}}
+
+## Details
+- **Category**: {{category}}
+- **Priority**: {{priority}}
+- **Estimated Time**: {{estimated_time}}
+- **Tags**: {{tags}}
+- **Created**: {{created_at}}
+
+## Todo ID
+\`{{todo_id}}\`
+`;
+      case 'subtask_creation':
+        return `# {{title}}
+
+{{description}}
+
+## Parent Task
+- **Parent ID**: {{parent_id}}
+- **Goal**: {{goal_title}}
+
+## Details
+- **Category**: {{category}}
+- **Estimated Time**: {{estimated_time}}
+- **Created**: {{created_at}}
+
+## Todo ID
+\`{{todo_id}}\`
+`;
+      case 'future_tasks':
+        return `# {{title}}
+
+{{description}}
+
+## Planning
+- **Estimated Start**: {{planned_start}}
+- **Estimated Duration**: {{estimated_time}}
+- **Priority**: {{priority}}
+- **Dependencies**: {{dependencies}}
+
+## Category & Tags
+- **Category**: {{category}}
+- **Tags**: {{tags}}
+
+## Notes
+{{notes}}
+
+## Todo ID
+\`{{todo_id}}\`
+`;
+      case 'daily_report':
+        return `# Daily Report - {{date}}
+
+## Goal: {{goal_title}}
+**Progress**: {{goal_progress}}%
+
+## Completed Today
+{{#completed_tasks}}
+- [ ] **{{title}}** ({{time_tracked}})
+  {{#commits}}
+  - Commit: {{.}}
+  {{/commits}}
+{{/completed_tasks}}
+
+## In Progress
+{{#in_progress_tasks}}
+- [ ] **{{title}}**
+  {{#blockers}}
+  - Blocker: {{.}}
+  {{/blockers}}
+{{/in_progress_tasks}}
+
+## Tomorrow's Focus
+{{#tomorrow_tasks}}
+- [ ] {{title}}
+{{/tomorrow_tasks}}
+
+## Notes
+{{notes}}
+`;
+      case 'weekly_report':
+        return `# Weekly Report - Week of {{week_start}}
+
+## Goal Progress
+- **Current Goal**: {{goal_title}}
+- **Overall Progress**: {{goal_progress}}%
+- **This Week's Progress**: {{week_progress}}%
+
+## Key Accomplishments
+{{#completed_tasks}}
+- {{title}} ({{time_tracked}})
+{{/completed_tasks}}
+
+## Active Development
+{{#in_progress_tasks}}
+- {{title}} - {{progress}}%
+{{/in_progress_tasks}}
+
+## Commits This Week
+{{#commits}}
+- {{message}} ({{hash}})
+{{/commits}}
+
+## Next Week's Priorities
+{{#next_week_tasks}}
+- {{title}}
+{{/next_week_tasks}}
+
+## Challenges & Blockers
+{{#blockers}}
+- {{.}}
+{{/blockers}}
+
+## Notes
+{{notes}}
+`;
+      default:
+        return '';
     }
   }
 }

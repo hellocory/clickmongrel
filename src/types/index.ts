@@ -200,10 +200,19 @@ export interface ProjectConfig {
     workspace_id?: string;
     default_space?: string;
     default_list?: string;
+    auto_assign_user?: boolean;
+    assignee_user_id?: number;
   };
   sync: SyncConfig;
   goals: GoalConfig;
   reports: ReportConfig;
+  templates: {
+    task_creation: string;
+    subtask_creation: string;
+    future_tasks: string;
+    daily_report: string;
+    weekly_report: string;
+  };
   hooks: {
     todo_write: boolean;
     git_commit: boolean;

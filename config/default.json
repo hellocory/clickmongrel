@@ -1,0 +1,46 @@
+{
+  "clickup": {
+    "api_key": "pk_138190514_O3WELFAWWV5OHNYNZBZVVLRH2D5FO4RK",
+    "default_space": "Ghost Codes Workspace",
+    "default_list": "Development Tasks",
+    "auto_assign_user": true,
+    "assignee_user_id": 138190514
+  },
+  "sync": {
+    "enabled": false,
+    "interval": 300,
+    "todo_write_sync": true,
+    "commit_tracking": true,
+    "auto_status_update": true
+  },
+  "goals": {
+    "track_progress": true,
+    "auto_switch": true,
+    "clickup_custom_field": "goal_id"
+  },
+  "reports": {
+    "daily": {
+      "enabled": true,
+      "time": "18:00",
+      "auto_submit": false
+    },
+    "weekly": {
+      "enabled": true,
+      "day": "friday",
+      "time": "17:00",
+      "auto_submit": false
+    }
+  },
+  "templates": {
+    "task_creation": "task_creation.md",
+    "subtask_creation": "subtask_creation.md",
+    "future_tasks": "future_tasks.md",
+    "daily_report": "daily_report.md",
+    "weekly_report": "weekly_report.md"
+  },
+  "hooks": {
+    "todo_write": true,
+    "git_commit": true,
+    "status_change": true
+  }
+}
