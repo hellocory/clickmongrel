@@ -9,14 +9,22 @@ export class SyncHandler {
   private syncInProgress: boolean;
   private listId: string | undefined;
 
-  constructor(apiKey: string) {
+  constructor(apiKey: string, listId?: string) {
     this.api = new ClickUpAPI(apiKey);
     this.syncQueue = new Map();
     this.syncInProgress = false;
+    this.listId = listId;
   }
 
   async initialize(): Promise<void> {
     try {
+      // If listId is already provided, just cache statuses
+      if (this.listId) {
+        logger.info(`Using provided list ID: ${this.listId}`);
+        await this.cacheListStatuses(this.listId);
+        return;
+      }
+      
       // Get default list ID
       const defaultSpace = configManager.getDefaultSpace();
       const defaultList = configManager.getDefaultList();
@@ -165,15 +173,7 @@ export class SyncHandler {
     const task = await this.api.createTask(this.listId, {
       name: todo.content,
       description: `Created from Claude TodoWrite\nID: ${todo.id}`,
-      status: { status, color: '', orderindex: 0, type: '', id: '' },
-      custom_fields: [
-        {
-          id: 'todo_id',
-          name: 'todo_id',
-          type: 'text',
-          value: todo.id
-        }
-      ]
+      status: { status } as any
     });
 
     // Update todo with ClickUp task ID

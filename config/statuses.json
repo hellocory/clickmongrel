@@ -1,0 +1,35 @@
+{
+  "spaces": {
+    "Ghost Codes Workspace": {
+      "lists": {
+        "Development Tasks": {
+          "statuses": [
+            {
+              "id": "p90139254308_fsAwOp41",
+              "status": "to do",
+              "orderindex": 0,
+              "color": "#87909e",
+              "type": "open",
+              "status_group": "proj_90139254308"
+            },
+            {
+              "id": "p90139254308_86p8fXp6",
+              "status": "complete",
+              "orderindex": 1,
+              "color": "#008844",
+              "type": "closed",
+              "status_group": "proj_90139254308"
+            }
+          ],
+          "default_status": "to do",
+          "complete_status": "complete"
+        }
+      }
+    }
+  },
+  "status_mappings": {
+    "pending": "to do",
+    "in_progress": "in progress",
+    "completed": "complete"
+  }
+}
