@@ -16,6 +16,7 @@ import TaskHandler from './handlers/tasks.js';
 import ReportHandler from './handlers/reports.js';
 import CommitHandler from './handlers/commits.js';
 import PlanHandler from './handlers/plans.js';
+import WorkflowHandler from './handlers/workflow.js';
 import logger from './utils/logger.js';
 import { TodoItem, ClickUpGoal } from './types/index.js';
 
@@ -30,6 +31,7 @@ class ClickMongrelServer {
   private reportHandler: ReportHandler;
   private commitHandler: CommitHandler;
   private planHandler: PlanHandler;
+  private workflowHandler: WorkflowHandler;
 
   constructor() {
     this.server = new Server(
@@ -52,6 +54,7 @@ class ClickMongrelServer {
     this.reportHandler = new ReportHandler(API_KEY);
     this.commitHandler = new CommitHandler(API_KEY);
     this.planHandler = new PlanHandler(API_KEY);
+    this.workflowHandler = new WorkflowHandler(API_KEY);
 
     this.setupHandlers();
   }
@@ -249,6 +252,43 @@ class ClickMongrelServer {
               plan_id: { type: 'string' }
             },
             required: ['plan_id']
+          }
+        },
+        {
+          name: 'workflow_create_tasks',
+          description: 'Create tasks with proper parent-subtask structure',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              todos: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    content: { type: 'string' },
+                    status: { type: 'string' },
+                    priority: { type: 'string' },
+                    tags: { type: 'array', items: { type: 'string' } }
+                  },
+                  required: ['id', 'content', 'status']
+                }
+              },
+              parent_title: { type: 'string' }
+            },
+            required: ['todos']
+          }
+        },
+        {
+          name: 'workflow_complete_task',
+          description: 'Complete a task with automatic commit and tracking',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              task_id: { type: 'string' },
+              commit_message: { type: 'string' }
+            },
+            required: ['task_id']
           }
         }
       ]
@@ -490,6 +530,32 @@ class ClickMongrelServer {
               content: [{
                 type: 'text',
                 text: JSON.stringify(plan, null, 2)
+              }]
+            };
+          }
+
+          case 'workflow_create_tasks': {
+            const todos = args?.todos as TodoItem[];
+            const parentTitle = args?.parent_title as string;
+            await this.workflowHandler.initialize();
+            const tasks = await this.workflowHandler.createTasksFromTodos(todos, parentTitle);
+            return {
+              content: [{
+                type: 'text',
+                text: `Created ${tasks.length} tasks${tasks[0]?.parentTaskId ? ' with parent task' : ''}`
+              }]
+            };
+          }
+
+          case 'workflow_complete_task': {
+            const taskId = args?.task_id as string;
+            const commitMessage = args?.commit_message as string;
+            await this.workflowHandler.initialize();
+            await this.workflowHandler.completeTask(taskId, commitMessage);
+            return {
+              content: [{
+                type: 'text',
+                text: `Completed task ${taskId} with commit`
               }]
             };
           }

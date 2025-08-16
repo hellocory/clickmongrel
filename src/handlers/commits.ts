@@ -38,8 +38,15 @@ export class CommitHandler {
         const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
         this.commitsListId = config.lists?.commits || null;
       }
+      
+      // Fallback to known Commits list ID
+      if (!this.commitsListId) {
+        this.commitsListId = '901317936118'; // Known Commits list in Ghost Codes workspace
+        logger.info('Using default Commits list ID: 901317936118');
+      }
     } catch (error) {
-      logger.warn('Could not load commits list ID from config');
+      logger.warn('Could not load commits list ID from config, using default');
+      this.commitsListId = '901317936118';
     }
   }
 
