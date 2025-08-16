@@ -8,6 +8,7 @@ export class SyncHandler {
   private syncQueue: Map<string, TodoItem>;
   private syncInProgress: boolean;
   private listId: string | undefined;
+  private todoIdFieldId: string | undefined;
 
   constructor(apiKey: string, listId?: string) {
     this.api = new ClickUpAPI(apiKey);
@@ -22,6 +23,7 @@ export class SyncHandler {
       if (this.listId) {
         logger.info(`Using provided list ID: ${this.listId}`);
         await this.cacheListStatuses(this.listId);
+        await this.detectCustomFields(this.listId);
         return;
       }
       
@@ -93,6 +95,34 @@ export class SyncHandler {
       logger.info('Cached list statuses');
     } catch (error) {
       logger.error('Failed to cache list statuses:', error);
+    }
+  }
+
+  private async detectCustomFields(listId: string): Promise<void> {
+    try {
+      const customFields = await this.api.getCustomFields(listId) as any[];
+      
+      // Look for existing "Todo ID" or "Claude Todo ID" field
+      const todoField = customFields.find((field: any) => 
+        field.name?.toLowerCase().includes('todo') && 
+        field.name?.toLowerCase().includes('id')
+      );
+      
+      if (todoField) {
+        this.todoIdFieldId = todoField.id;
+        logger.info(`✓ Found Todo ID custom field: ${todoField.name} (${todoField.id})`);
+        logger.info('Claude can now perfectly track TodoWrite items with this custom field!');
+      } else {
+        logger.info('ℹ️  No Todo ID custom field detected.');
+        logger.info('📋 To improve Claude\'s relation capabilities:');
+        logger.info('   1. Go to your ClickUp list settings');
+        logger.info('   2. Create a custom field named "Claude Todo ID" (type: Text)');
+        logger.info('   3. Restart ClickMongrel to auto-detect it');
+        logger.info('');
+        logger.info('🔄 Fallback: Using task description to track TodoWrite IDs');
+      }
+    } catch (error) {
+      logger.warn('Failed to detect custom fields, using description fallback:', error);
     }
   }
 
@@ -170,11 +200,26 @@ export class SyncHandler {
 
     const status = configManager.getStatusMapping(todo.status);
     
-    const task = await this.api.createTask(this.listId, {
+    // Prepare task data
+    const taskData: any = {
       name: todo.content,
-      description: `Created from Claude TodoWrite\nID: ${todo.id}`,
+      description: this.todoIdFieldId 
+        ? `Created from Claude TodoWrite\nTodo ID: ${todo.id}`
+        : `Created from Claude TodoWrite\n\n🔗 TodoWrite ID: ${todo.id}\n\nNote: Create a "Claude Todo ID" custom field in ClickUp for better tracking!`,
       status: { status } as any
-    });
+    };
+    
+    // Add custom field if available (preferred method)
+    if (this.todoIdFieldId) {
+      taskData.custom_fields = [
+        {
+          id: this.todoIdFieldId,
+          value: todo.id
+        }
+      ];
+    }
+    
+    const task = await this.api.createTask(this.listId, taskData);
 
     // Update todo with ClickUp task ID
     todo.clickup_task_id = task.id;
