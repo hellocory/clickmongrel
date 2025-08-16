@@ -159,12 +159,12 @@ export class QuickSetup {
   private async createCommitTemplates(): Promise<void> {
     console.log(chalk.yellow('\n📝 Setting up commit templates...'));
     
-    const commitTemplatePath = path.join(process.cwd(), 'config', 'commit-templates.json');
-    const configDir = path.dirname(commitTemplatePath);
+    const commitTemplatePath = path.join(process.cwd(), '.claude/clickup/templates/commit-templates.json');
+    const templateDir = path.dirname(commitTemplatePath);
     
-    // Ensure config directory exists
-    if (!fs.existsSync(configDir)) {
-      fs.mkdirSync(configDir, { recursive: true });
+    // Ensure template directory exists
+    if (!fs.existsSync(templateDir)) {
+      fs.mkdirSync(templateDir, { recursive: true });
     }
     
     if (!fs.existsSync(commitTemplatePath)) {

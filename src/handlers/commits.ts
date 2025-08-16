@@ -68,9 +68,19 @@ export class CommitHandler {
   
   private loadTemplates(): void {
     try {
-      const templatePath = path.join(__dirname, '../../config/commit-templates.json');
-      if (fs.existsSync(templatePath)) {
-        this.templates = JSON.parse(fs.readFileSync(templatePath, 'utf-8'));
+      // Try project-specific templates first
+      const projectTemplatePath = path.join(process.cwd(), '.claude/clickup/templates/commit-templates.json');
+      if (fs.existsSync(projectTemplatePath)) {
+        this.templates = JSON.parse(fs.readFileSync(projectTemplatePath, 'utf-8'));
+        logger.info('Loaded project commit templates');
+        return;
+      }
+      
+      // Fallback to default templates in MCP installation
+      const defaultTemplatePath = path.join(__dirname, '../../.claude/clickup/templates/commit-templates.json');
+      if (fs.existsSync(defaultTemplatePath)) {
+        this.templates = JSON.parse(fs.readFileSync(defaultTemplatePath, 'utf-8'));
+        logger.info('Loaded default commit templates');
       } else {
         // Default templates if file doesn't exist
         this.templates = {

@@ -246,10 +246,28 @@ async function init() {
 
     console.log(chalk.green('✓ Configuration saved'));
 
-    // Step 11: Create commit templates if they don't exist
+    // Step 11: Create .claude/clickup structure first
+    console.log(chalk.yellow('\nCreating .claude/clickup structure...'));
+    const claudeDir = path.join(process.cwd(), '.claude/clickup');
+    const templatesDir = path.join(claudeDir, 'templates');
+    
+    // Ensure directories exist
+    if (!fs.existsSync(claudeDir)) {
+      fs.mkdirSync(claudeDir, { recursive: true });
+    }
+    if (!fs.existsSync(templatesDir)) {
+      fs.mkdirSync(templatesDir, { recursive: true });
+    }
+
+    // Step 12: Create commit templates if they don't exist
     console.log(chalk.yellow('Setting up commit templates...'));
-    const commitTemplatePath = path.join(__dirname, '../config/commit-templates.json');
+    const commitTemplatePath = path.join(claudeDir, 'templates', 'commit-templates.json');
     if (!fs.existsSync(commitTemplatePath)) {
+      // Ensure templates directory exists
+      const templateDir = path.dirname(commitTemplatePath);
+      if (!fs.existsSync(templateDir)) {
+        fs.mkdirSync(templateDir, { recursive: true });
+      }
       const defaultCommitTemplates = {
         templates: {
           default: {
@@ -288,10 +306,8 @@ async function init() {
       console.log(chalk.green('✓ Commit templates already exist'));
     }
 
-    // Step 12: Create templates folder and files
-    console.log(chalk.yellow('\nCreating .claude/clickup structure...'));
-    const claudeDir = path.join(__dirname, '../.claude/clickup');
-    const templatesDir = path.join(claudeDir, 'templates');
+    // Step 13: Create template files with default content
+    console.log(chalk.yellow('Creating template files...'));
     
     if (!fs.existsSync(templatesDir)) {
       fs.mkdirSync(templatesDir, { recursive: true });
