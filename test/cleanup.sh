@@ -92,21 +92,103 @@ cleanup_github_repos() {
 cleanup_clickup_data() {
     header "Cleaning ClickUp Data"
     
-    warning "Manual cleanup required in ClickUp:"
-    echo "1. Go to ClickUp → Ghost Codes's Workspace → Agentic Development"
-    echo "2. Delete test tasks from Tasks list"
-    echo "3. Delete test commits from Commits list"
-    echo "4. Archive or delete test goals"
-    echo ""
-    
-    read -p "Have you cleaned ClickUp data? (y/n) " -n 1 -r
-    echo
-    
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        success "ClickUp data cleaned"
-    else
-        warning "Remember to clean ClickUp data manually"
+    # Check if we have API key
+    if [ -z "$CLICKUP_API_KEY" ]; then
+        warning "No ClickUp API key found. Manual cleanup required:"
+        echo "1. Go to ClickUp workspace"
+        echo "2. Delete test spaces created during testing"
+        echo "3. Delete test tasks from Tasks list"
+        echo "4. Delete test commits from Commits list"
+        echo "5. Archive or delete test goals"
+        echo ""
+        
+        read -p "Have you cleaned ClickUp data? (y/n) " -n 1 -r
+        echo
+        
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            success "ClickUp data cleaned"
+        else
+            warning "Remember to clean ClickUp data manually"
+        fi
+        return
     fi
+    
+    # Attempt automatic cleanup
+    log "Attempting automatic ClickUp cleanup..."
+    
+    # Get workspace/team ID
+    TEAM_DATA=$(curl -s "https://api.clickup.com/api/v2/team" \
+        -H "Authorization: $CLICKUP_API_KEY" 2>/dev/null || true)
+    
+    if [ -n "$TEAM_DATA" ]; then
+        TEAM_ID=$(echo "$TEAM_DATA" | jq -r '.teams[0].id' 2>/dev/null || true)
+        
+        if [ -n "$TEAM_ID" ]; then
+            # Get all spaces
+            SPACES_DATA=$(curl -s "https://api.clickup.com/api/v2/team/${TEAM_ID}/space" \
+                -H "Authorization: $CLICKUP_API_KEY" 2>/dev/null || true)
+            
+            # Find test spaces (containing "Test" in name)
+            TEST_SPACES=$(echo "$SPACES_DATA" | \
+                jq -r '.spaces[] | select(.name | test("Test|test")) | "\(.id):\(.name)"' 2>/dev/null || true)
+            
+            if [ -n "$TEST_SPACES" ]; then
+                echo "Found test spaces:"
+                while IFS=: read -r space_id space_name; do
+                    echo "  - $space_name (ID: $space_id)"
+                done <<< "$TEST_SPACES"
+                echo ""
+                
+                read -p "Delete these test spaces? (y/n) " -n 1 -r
+                echo
+                
+                if [[ $REPLY =~ ^[Yy]$ ]]; then
+                    while IFS=: read -r space_id space_name; do
+                        log "Deleting space: $space_name"
+                        RESULT=$(curl -s -X DELETE "https://api.clickup.com/api/v2/space/${space_id}" \
+                            -H "Authorization: $CLICKUP_API_KEY" 2>&1)
+                        
+                        if [ $? -eq 0 ]; then
+                            success "Deleted space: $space_name"
+                        else
+                            warning "Could not delete space: $space_name"
+                        fi
+                    done <<< "$TEST_SPACES"
+                else
+                    warning "Skipping space deletion"
+                fi
+            else
+                log "No test spaces found"
+            fi
+            
+            # Also check for test lists in the main space
+            echo ""
+            log "Checking for test lists in existing spaces..."
+            
+            # Get all lists from all spaces
+            ALL_SPACES=$(echo "$SPACES_DATA" | jq -r '.spaces[].id' 2>/dev/null || true)
+            
+            for space_id in $ALL_SPACES; do
+                LISTS_DATA=$(curl -s "https://api.clickup.com/api/v2/space/${space_id}/list" \
+                    -H "Authorization: $CLICKUP_API_KEY" 2>/dev/null || true)
+                
+                TEST_LISTS=$(echo "$LISTS_DATA" | \
+                    jq -r '.lists[] | select(.name | test("Test|test|Commits")) | "\(.id):\(.name)"' 2>/dev/null || true)
+                
+                if [ -n "$TEST_LISTS" ]; then
+                    echo "Found test/commits lists in space $space_id:"
+                    while IFS=: read -r list_id list_name; do
+                        echo "  - $list_name (ID: $list_id)"
+                    done <<< "$TEST_LISTS"
+                fi
+            done
+        fi
+    else
+        warning "Could not connect to ClickUp API"
+    fi
+    
+    echo ""
+    warning "Please verify in ClickUp that all test data has been removed"
 }
 
 cleanup_test_directories() {

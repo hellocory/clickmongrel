@@ -290,6 +290,21 @@ class ClickMongrelServer {
             },
             required: ['task_id']
           }
+        },
+        {
+          name: 'initialize_clickup',
+          description: 'Initialize ClickUp integration for the current project',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              workspace_name: { type: 'string', description: 'Name of ClickUp workspace' },
+              space_name: { type: 'string', description: 'Name of space to create or use' },
+              list_name: { type: 'string', description: 'Name of list for tasks (default: Tasks)' },
+              enable_commits: { type: 'boolean', description: 'Enable commit tracking (default: true)' },
+              enable_goals: { type: 'boolean', description: 'Enable goal tracking (default: true)' }
+            },
+            required: ['workspace_name']
+          }
         }
       ]
     }));
@@ -558,6 +573,40 @@ class ClickMongrelServer {
                 text: `Completed task ${taskId} with commit`
               }]
             };
+          }
+
+          case 'initialize_clickup': {
+            const workspaceName = args?.workspace_name as string;
+            const spaceName = args?.space_name as string || 'Test Project';
+            const listName = args?.list_name as string || 'Tasks';
+            const enableCommits = args?.enable_commits !== false;
+            const enableGoals = args?.enable_goals !== false;
+            
+            // Initialize the setup handler
+            const { execSync } = await import('child_process');
+            const cwd = process.cwd();
+            
+            try {
+              // Run the quick-setup script
+              const result = execSync(
+                `node ${__dirname}/quick-setup.js "${workspaceName}" "${spaceName}" "${listName}" ${enableCommits} ${enableGoals}`,
+                { cwd, encoding: 'utf-8' }
+              );
+              
+              return {
+                content: [{
+                  type: 'text',
+                  text: `ClickUp integration initialized successfully!\n\nWorkspace: ${workspaceName}\nSpace: ${spaceName}\nList: ${listName}\nCommit tracking: ${enableCommits ? 'enabled' : 'disabled'}\nGoal tracking: ${enableGoals ? 'enabled' : 'disabled'}\n\n${result}`
+                }]
+              };
+            } catch (error: any) {
+              return {
+                content: [{
+                  type: 'text',
+                  text: `Failed to initialize ClickUp: ${error.message}`
+                }]
+              };
+            }
           }
 
           default:

@@ -63,7 +63,7 @@ git push -u origin main
 claude mcp add clickmongrel \
   --env CLICKUP_API_KEY=pk_138190514_O3WELFAWWV5OHNYNZBZVVLRH2D5FO4RK \
   --env CLICKUP_WORKSPACE="Ghost Codes's Workspace" \
-  --env CLICKUP_SPACE="Agentic Development" \
+  --env CLICKUP_SPACE="Test Project" \
   -- node "$TEST_DIR/clickmongrel-test/dist/index.js"
 
 # Verify MCP is listed
@@ -88,14 +88,13 @@ claude
 Claude, please:
 
 1. Initialize ClickUp integration for this project using the clickmongrel MCP
-2. Run: node dist/cli.js setup-clickup --workspace-name "Ghost Codes's Workspace"
-3. Configure the following:
+2. Configure the following:
    - Enable auto-commit tracking
    - Enable ClickUp commits list tracking  
    - Enable goal tracking
    - Set up commit templates
-4. Create a test goal called "ClickMongrel Integration Test"
-5. Verify all configurations are saved to .claude/clickup/
+3. Create a test goal called "ClickMongrel Integration Test"
+4. Verify all configurations are saved to .claude/clickup/
 ```
 
 ### Phase 3: Core Functionality Testing
