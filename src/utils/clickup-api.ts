@@ -245,7 +245,7 @@ export class ClickUpAPI {
       owner: goal.owner?.id
     });
     
-    const newGoal = response.data;
+    const newGoal = response.data.goal || response.data;
     cache.setGoal(newGoal);
     logger.info(`Created goal: ${newGoal.id} - ${newGoal.name}`);
     return newGoal;
@@ -256,7 +256,7 @@ export class ClickUpAPI {
       percent_completed: percentComplete
     });
     
-    const updatedGoal = response.data;
+    const updatedGoal = response.data.goal || response.data;
     cache.setGoal(updatedGoal);
     logger.info(`Updated goal ${goalId} progress to: ${percentComplete}%`);
     return updatedGoal;

@@ -69,13 +69,14 @@ export class GoalHandler {
     }
   }
 
-  async updateProgress(percentComplete: number): Promise<ClickUpGoal> {
-    if (!this.currentGoalId) {
-      throw new Error('No current goal set');
+  async updateGoalProgress(goalId: string, percentComplete: number): Promise<ClickUpGoal> {
+    const targetGoalId = goalId || this.currentGoalId;
+    if (!targetGoalId) {
+      throw new Error('No goal ID provided or current goal set');
     }
 
     try {
-      const goal = await this.api.updateGoalProgress(this.currentGoalId, percentComplete);
+      const goal = await this.api.updateGoalProgress(targetGoalId, percentComplete);
       logger.info(`Updated goal progress to ${percentComplete}%`);
       return goal;
     } catch (error) {
@@ -84,28 +85,27 @@ export class GoalHandler {
     }
   }
 
-  async createGoal(name: string, description?: string): Promise<ClickUpGoal> {
+  async createGoal(goal: Partial<ClickUpGoal>): Promise<ClickUpGoal> {
     if (!this.teamId) {
       throw new Error('Team ID not initialized');
     }
 
     try {
       const user = await this.api.getCurrentUser();
-      const goal = await this.api.createGoal(this.teamId, {
-        name,
-        description,
-        owner: user
+      const newGoal = await this.api.createGoal(this.teamId, {
+        ...goal,
+        owner: goal.owner || user
       });
       
-      logger.info(`Created new goal: ${goal.name}`);
-      return goal;
+      logger.info(`Created new goal: ${newGoal.name}`);
+      return newGoal;
     } catch (error) {
       logger.error('Failed to create goal:', error);
       throw error;
     }
   }
 
-  async listGoals(): Promise<ClickUpGoal[]> {
+  async getGoals(): Promise<ClickUpGoal[]> {
     if (!this.teamId) {
       throw new Error('Team ID not initialized');
     }

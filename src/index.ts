@@ -16,7 +16,7 @@ import TaskHandler from './handlers/tasks.js';
 import ReportHandler from './handlers/reports.js';
 import CommitHandler from './handlers/commits.js';
 import logger from './utils/logger.js';
-import { TodoItem } from './types/index.js';
+import { TodoItem, ClickUpGoal } from './types/index.js';
 
 // Get API key from environment or configuration
 const API_KEY = process.env.CLICKUP_API_KEY || configManager.getApiKey() || '';
@@ -110,6 +110,28 @@ class ClickMongrelServer {
               percent: { type: 'number', minimum: 0, maximum: 100 }
             },
             required: ['percent']
+          }
+        },
+        {
+          name: 'list_goals',
+          description: 'List all available goals',
+          inputSchema: {
+            type: 'object',
+            properties: {}
+          }
+        },
+        {
+          name: 'create_goal',
+          description: 'Create a new goal',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              name: { type: 'string' },
+              description: { type: 'string' },
+              percent_completed: { type: 'number', minimum: 0, maximum: 100 },
+              color: { type: 'string' }
+            },
+            required: ['name']
           }
         },
         {
@@ -285,11 +307,37 @@ class ClickMongrelServer {
 
           case 'update_goal_progress': {
             const percent = args?.percent as number;
-            await this.goalHandler.updateProgress(percent);
+            const currentGoalId = this.goalHandler.getCurrentGoalId();
+            if (!currentGoalId) {
+              throw new Error('No current goal set');
+            }
+            await this.goalHandler.updateGoalProgress(currentGoalId, percent);
             return {
               content: [{
                 type: 'text',
                 text: `Updated goal progress to ${percent}%`
+              }]
+            };
+          }
+
+          case 'list_goals': {
+            await this.goalHandler.initialize();
+            const goals = await this.goalHandler.getGoals();
+            return {
+              content: [{
+                type: 'text',
+                text: JSON.stringify(goals, null, 2)
+              }]
+            };
+          }
+
+          case 'create_goal': {
+            await this.goalHandler.initialize();
+            const goal = await this.goalHandler.createGoal(args as Partial<ClickUpGoal>);
+            return {
+              content: [{
+                type: 'text',
+                text: `Created goal: ${goal.name} (ID: ${goal.id})`
               }]
             };
           }

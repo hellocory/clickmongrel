@@ -179,12 +179,17 @@ program
           console.log(chalk.red('Progress must be between 0 and 100'));
           process.exit(1);
         }
-        await goalHandler.updateProgress(percent);
+        const currentGoalId = goalHandler.getCurrentGoalId();
+        if (!currentGoalId) {
+          console.log(chalk.red('No current goal set'));
+          process.exit(1);
+        }
+        await goalHandler.updateGoalProgress(currentGoalId, percent);
         console.log(chalk.green(`✓ Updated progress to ${percent}%`));
       } else if (options.list) {
-        const goals = await goalHandler.listGoals();
+        const goals = await goalHandler.getGoals();
         console.log(chalk.cyan.bold('\n📋 All Goals\n'));
-        goals.forEach(goal => {
+        goals.forEach((goal: any) => {
           console.log(`• ${goal.name} (${goal.percent_completed}%) - ${chalk.gray(goal.id)}`);
         });
       } else {
