@@ -5,10 +5,10 @@ dist/
 .env.local
 .claude/
 CLAUDE.md
-test/
+# Test runs but not test scripts
+test-runs/
 *.test.js
 *-test.js
-test-*.js
 init-*.js
 setup-*.js
 

@@ -257,6 +257,8 @@ export interface CommitInfo {
   author: string;
   timestamp: string;
   task_id?: string;
+  changes?: string;
+  files?: string[];
 }
 
 export interface DailyReport {

@@ -49,7 +49,10 @@ export class QuickSetup {
       // Step 3: Create standard structure
       await this.createStandardStructure();
 
-      // Step 4: Save project configuration
+      // Step 4: Create commit templates
+      await this.createCommitTemplates();
+
+      // Step 5: Save project configuration
       await this.saveProjectConfig();
 
       // Step 5: Update MCP configuration
@@ -121,6 +124,60 @@ export class QuickSetup {
       this.config.spaceId = newSpace.id;
       this.config.spaceName = newSpace.name;
       console.log(chalk.green(`✓ Created space: ${newSpace.name}`));
+    }
+  }
+
+  /**
+   * Create commit templates
+   */
+  private async createCommitTemplates(): Promise<void> {
+    console.log(chalk.yellow('\n📝 Setting up commit templates...'));
+    
+    const commitTemplatePath = path.join(process.cwd(), 'config', 'commit-templates.json');
+    const configDir = path.dirname(commitTemplatePath);
+    
+    // Ensure config directory exists
+    if (!fs.existsSync(configDir)) {
+      fs.mkdirSync(configDir, { recursive: true });
+    }
+    
+    if (!fs.existsSync(commitTemplatePath)) {
+      const defaultCommitTemplates = {
+        templates: {
+          default: {
+            title: "[COMMIT] {type}: {description}",
+            body: "## Commit Details\\n\\n**Type:** {type}\\n**Scope:** {scope}\\n**Description:** {description}\\n\\n**Hash:** `{hash}`\\n**Author:** {author}\\n**Timestamp:** {timestamp}\\n\\n### Changes\\n{changes}\\n\\n### Files Modified\\n{files}\\n\\n---\\n*Tracked by ClickMongrel MCP*"
+          },
+          simple: {
+            title: "{type}: {description}",
+            body: "Commit: `{hash}`\\nAuthor: {author}\\n\\n{description}"
+          },
+          detailed: {
+            title: "[{type}] {scope}: {description} ({hash_short})",
+            body: "## 📝 Commit Information\\n\\n### Summary\\n{description}\\n\\n### Details\\n- **Type:** `{type}`\\n- **Scope:** `{scope}`\\n- **Hash:** `{hash}`\\n- **Author:** {author}\\n- **Date:** {timestamp}\\n\\n### Modified Files\\n```\\n{files}\\n```\\n\\n### Full Commit Message\\n```\\n{raw_message}\\n```"
+          }
+        },
+        typeMapping: {
+          feat: "✨ Feature",
+          fix: "🐛 Fix",
+          docs: "📚 Documentation",
+          style: "💎 Style",
+          refactor: "♻️ Refactor",
+          test: "✅ Test",
+          chore: "🔧 Chore",
+          perf: "⚡ Performance",
+          ci: "👷 CI",
+          build: "📦 Build",
+          revert: "⏪ Revert"
+        },
+        defaultTemplate: "default",
+        parsePattern: "^(?<type>\\\\w+)(?:\\\\((?<scope>[^)]+)\\\\))?:\\\\s+(?<description>.+)$"
+      };
+      
+      fs.writeFileSync(commitTemplatePath, JSON.stringify(defaultCommitTemplates, null, 2));
+      console.log(chalk.green('✓ Commit templates created'));
+    } else {
+      console.log(chalk.green('✓ Commit templates already exist'));
     }
   }
 

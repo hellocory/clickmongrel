@@ -6,12 +6,29 @@ import logger from '../utils/logger.js';
 import { execSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+interface CommitTemplate {
+  title: string;
+  body: string;
+}
+
+interface CommitTemplates {
+  templates: Record<string, CommitTemplate>;
+  typeMapping: Record<string, string>;
+  defaultTemplate: string;
+  parsePattern: string;
+}
 
 export class CommitHandler {
   private api: ClickUpAPI;
   private taskHandler: TaskHandler;
   private goalHandler: GoalHandler;
   private commitsListId: string | null = null;
+  private templates!: CommitTemplates;
   
   // Status lifecycle mapping - MUST match ClickUp statuses exactly (lowercase)
   private statusLifecycle = {
@@ -28,6 +45,37 @@ export class CommitHandler {
     this.taskHandler = new TaskHandler(apiKey);
     this.goalHandler = new GoalHandler(apiKey);
     this.loadCommitsListId();
+    this.loadTemplates();
+  }
+  
+  private loadTemplates(): void {
+    try {
+      const templatePath = path.join(__dirname, '../../config/commit-templates.json');
+      if (fs.existsSync(templatePath)) {
+        this.templates = JSON.parse(fs.readFileSync(templatePath, 'utf-8'));
+      } else {
+        // Default templates if file doesn't exist
+        this.templates = {
+          templates: {
+            default: {
+              title: '[COMMIT] {type}: {description}',
+              body: '## Commit Details\n\n**Hash:** `{hash}`\n**Author:** {author}\n**Timestamp:** {timestamp}\n\n{raw_message}'
+            }
+          },
+          typeMapping: {
+            feat: '✨ Feature',
+            fix: '🐛 Fix',
+            docs: '📚 Documentation',
+            test: '✅ Test',
+            chore: '🔧 Chore'
+          },
+          defaultTemplate: 'default',
+          parsePattern: '^(?<type>\\w+)(?:\\((?<scope>[^)]+)\\))?:\\s+(?<description>.+)$'
+        };
+      }
+    } catch (error) {
+      logger.warn('Could not load commit templates, using defaults');
+    }
   }
   
   private loadCommitsListId(): void {
@@ -101,13 +149,12 @@ export class CommitHandler {
       const branch = this.getCurrentBranch();
       const status = this.getStatusForBranch(branch);
       
-      // Parse commit message
-      const { type, description } = this.parseCommitMessage(commit.message);
-      const shortHash = commit.hash.substring(0, 7);
+      // Parse commit message (now handled by formatWithTemplate)
       
-      // Create task
-      const taskName = `[COMMIT] ${type}: ${description} (${shortHash})`;
-      const taskDescription = this.formatCommitDescription(commit, branch);
+      // Format using template
+      const { title, body } = this.formatWithTemplate(commit, branch);
+      const taskName = title;
+      const taskDescription = body;
       
       // Add branch tag to description since tags aren't supported in createTask
       const fullDescription = `${taskDescription}\n\n**Branch Tag:** ${this.formatBranchTag(branch)}`;
@@ -185,14 +232,15 @@ export class CommitHandler {
     return 'comitted'; // Note: ClickUp has typo in their status name
   }
   
-  private parseCommitMessage(message: string): { type: string; description: string } {
-    const match = message.match(/^(\w+)(?:\([^)]+\))?:\s*(.+)/);
-    if (match) {
-      return { type: match[1] || 'commit', description: match[2] || message };
-    }
-    const desc = message.substring(0, 50);
-    return { type: 'commit', description: desc };
-  }
+  // Replaced by parseCommitMessageDetailed
+  // private parseCommitMessage(message: string): { type: string; description: string } {
+  //   const match = message.match(/^(\w+)(?:\([^)]+\))?:\s*(.+)/);
+  //   if (match) {
+  //     return { type: match[1] || 'commit', description: match[2] || message };
+  //   }
+  //   const desc = message.substring(0, 50);
+  //   return { type: 'commit', description: desc };
+  // }
   
   private formatBranchTag(branch: string): string {
     if (branch === 'main' || branch === 'master' || branch === 'production') {
@@ -207,6 +255,74 @@ export class CommitHandler {
     return `dev:${branch}`;
   }
   
+  private formatWithTemplate(commit: CommitInfo, branch?: string): { title: string; body: string } {
+    const templateName = this.templates?.defaultTemplate || 'default';
+    const template = this.templates?.templates?.[templateName] || this.templates?.templates?.default || {
+      title: '[COMMIT] {type}: {description}',
+      body: '## Commit Details\n\n**Hash:** `{hash}`\n**Author:** {author}\n**Timestamp:** {timestamp}\n\n{raw_message}'
+    };
+    
+    const { type, description, scope } = this.parseCommitMessageDetailed(commit.message);
+    const shortHash = commit.hash.substring(0, 7);
+    const currentBranch = branch || this.getCurrentBranch();
+    
+    // Get mapped type with emoji if available
+    const mappedType = this.templates.typeMapping[type] || type;
+    
+    // Replace variables in template
+    const replacements: Record<string, string> = {
+      type: mappedType,
+      description,
+      scope: scope || 'general',
+      hash: commit.hash,
+      hash_short: shortHash,
+      author: commit.author || 'Unknown',
+      timestamp: commit.timestamp || new Date().toISOString(),
+      branch: currentBranch,
+      raw_message: commit.message,
+      changes: commit.changes || 'No changes tracked',
+      files: commit.files?.join('\n') || 'No files tracked'
+    };
+    
+    const title = this.replaceTemplateVars(template.title, replacements);
+    const body = this.replaceTemplateVars(template.body, replacements);
+    
+    return { title, body };
+  }
+  
+  private parseCommitMessageDetailed(message: string): { type: string; scope?: string; description: string } {
+    const pattern = new RegExp(this.templates.parsePattern);
+    const match = message.match(pattern);
+    
+    if (match && match.groups) {
+      return {
+        type: match.groups.type || 'commit',
+        scope: match.groups.scope,
+        description: match.groups.description || message
+      };
+    }
+    
+    // Fallback to simple parsing
+    const simpleMatch = message.match(/^(\w+)(?:\(([^)]+)\))?:\s*(.+)/);
+    if (simpleMatch) {
+      return {
+        type: simpleMatch[1] || 'commit',
+        scope: simpleMatch[2],
+        description: simpleMatch[3] || message
+      };
+    }
+    
+    return { type: 'commit', description: message };
+  }
+  
+  private replaceTemplateVars(template: string, vars: Record<string, string>): string {
+    return template.replace(/\{(\w+)\}/g, (match, key) => {
+      return vars[key] || match;
+    });
+  }
+  
+  // Legacy format method - kept for reference but replaced by formatWithTemplate
+  /*
   private formatCommitDescription(commit: CommitInfo, branch: string): string {
     return `## Commit Details
 **Hash:** \`${commit.hash}\`
@@ -228,6 +344,7 @@ Tracking this commit through:
 ---
 *Tracked by ClickMongrel*`;
   }
+  */
   
   private storeCommitTaskMapping(commitHash: string, taskId: string): void {
     // Store in a local cache file for now
