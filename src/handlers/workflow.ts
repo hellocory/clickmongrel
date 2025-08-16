@@ -1,6 +1,7 @@
-import { TodoItem, ClickUpTask } from '../types/index.js';
+import { TodoItem, ClickUpTask, CommitInfo } from '../types/index.js';
 import ClickUpAPI from '../utils/clickup-api.js';
 import SyncHandler from './sync.js';
+import CommitHandler from './commits.js';
 import configManager from '../config/index.js';
 import logger from '../utils/logger.js';
 import { execSync } from 'child_process';
@@ -21,12 +22,14 @@ export interface WorkflowTask {
 export class WorkflowHandler {
   private api: ClickUpAPI;
   private syncHandler: SyncHandler;
+  private commitHandler: CommitHandler;
   private listId: string | undefined;
   private activeTasks: Map<string, WorkflowTask[]>;
 
   constructor(apiKey: string) {
     this.api = new ClickUpAPI(apiKey);
     this.syncHandler = new SyncHandler(apiKey);
+    this.commitHandler = new CommitHandler(apiKey);
     this.activeTasks = new Map();
   }
 
@@ -84,8 +87,20 @@ export class WorkflowHandler {
       if (this.isGitRepo()) {
         const commit = await this.createAndCommit(task.name, commitMessage);
         if (commit) {
+          // IMPORTANT: Create task in Commits list
+          const commitInfo: CommitInfo = {
+            hash: commit.hash,
+            message: commit.message,
+            author: 'Claude AI',
+            timestamp: commit.timestamp,
+            task_id: taskId
+          };
           
-          // Add commit info as comment on the task
+          // This creates the commit task in the Commits list!
+          await this.commitHandler.linkCommit(commitInfo);
+          logger.info(`Created commit task in Commits list for ${commit.hash}`);
+          
+          // Also add commit info as comment on the task
           const commitComment = `### 🔗 Commit Linked\n\n` +
             `**Hash:** \`${commit.hash.substring(0, 8)}\`\n` +
             `**Message:** ${commit.message}\n` +
