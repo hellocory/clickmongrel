@@ -149,10 +149,10 @@ export class ClickUpAPI {
   }
 
   // Task methods
-  async getTasks(listId: string, includeSubtasks = false): Promise<ClickUpTask[]> {
+  async getTasks(listId: string, includeSubtasks = true): Promise<ClickUpTask[]> {
     const response = await this.client.get(`/list/${listId}/task`, {
       params: {
-        include_subtasks: includeSubtasks,
+        subtasks: includeSubtasks,  // Fixed parameter name to match API docs
         include_closed: false,
         include_tags: true
       }
