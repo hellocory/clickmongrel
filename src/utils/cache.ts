@@ -25,12 +25,22 @@ class CacheManager {
     return this.taskCache.get<ClickUpTask>(taskId);
   }
 
-  setTasks(tasks: ClickUpTask[]): void {
+  setTasks(tasks: ClickUpTask[], listId?: string): void {
     tasks.forEach(task => this.setTask(task));
+    // Also cache the list of tasks for this list
+    if (listId) {
+      this.taskCache.set(`list:${listId}`, tasks);
+    }
   }
 
-  getTasks(): ClickUpTask[] {
-    const keys = this.taskCache.keys();
+  getTasks(listId?: string): ClickUpTask[] {
+    if (listId) {
+      // Try to get the cached list of tasks for this specific list
+      const listTasks = this.taskCache.get<ClickUpTask[]>(`list:${listId}`);
+      if (listTasks) return listTasks;
+    }
+    // Fallback to getting all cached tasks
+    const keys = this.taskCache.keys().filter(k => !k.startsWith('list:'));
     return keys.map(key => this.taskCache.get<ClickUpTask>(key)).filter(Boolean) as ClickUpTask[];
   }
 

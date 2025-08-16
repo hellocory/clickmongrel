@@ -502,43 +502,48 @@ export class SyncHandler {
     try {
       logger.debug(`Checking parent task ${parentTaskId} for auto-completion...`);
       
-      // Get the parent task
-      const parentTask = await this.api.getTask(parentTaskId);
+      // Force fresh fetch - bypass cache to get current status
+      const parentTask = await this.api.getTask(parentTaskId, true); // force refresh
       logger.debug(`Parent task: ${parentTask.name}, current status: ${parentTask.status.status}`);
       
-      // Get all subtasks of this parent
-      const allTasks = await this.api.getTasks(this.listId!, true); // Include subtasks
+      // Get fresh list of all tasks including subtasks - IMPORTANT: force refresh
+      const allTasks = await this.api.getTasks(this.listId!, true, true); // Include subtasks, force refresh
+      
+      // Find all subtasks of this parent
       const subtasks = allTasks.filter(t => t.parent === parentTaskId);
       
       if (subtasks.length === 0) {
-        logger.debug(`No subtasks found for parent task ${parentTaskId}`);
+        logger.warn(`No subtasks found for parent task ${parentTaskId} - this shouldn't happen`);
         return;
       }
       
-      logger.debug(`Found ${subtasks.length} subtasks for parent ${parentTaskId}`);
+      logger.info(`Found ${subtasks.length} subtasks for parent ${parentTaskId}`);
+      
+      // Check each subtask status
+      const completedStatuses = ['completed', 'done', 'complete', 'closed'];
+      let completedCount = 0;
+      
       subtasks.forEach(st => {
-        logger.debug(`  - Subtask: ${st.name} (${st.id}), status: ${st.status.status}`);
+        const isCompleted = completedStatuses.includes(st.status.status.toLowerCase());
+        logger.debug(`  - Subtask: ${st.name} (${st.id}), status: ${st.status.status}, completed: ${isCompleted}`);
+        if (isCompleted) completedCount++;
       });
       
-      // Check if all subtasks are completed
-      const completedStatuses = ['completed', 'done', 'complete', 'closed'];
-      const allSubtasksCompleted = subtasks.every(t => 
-        completedStatuses.includes(t.status.status.toLowerCase())
-      );
-      
-      logger.debug(`All subtasks completed: ${allSubtasksCompleted}`);
+      const allSubtasksCompleted = completedCount === subtasks.length;
+      logger.info(`Subtask completion: ${completedCount}/${subtasks.length} completed`);
       
       const parentCompleted = completedStatuses.includes(parentTask.status.status.toLowerCase());
       
       if (allSubtasksCompleted && !parentCompleted) {
-        // Complete the parent task
+        // All subtasks are done - complete the parent task
         const completedStatus = configManager.getStatusMapping('completed');
-        logger.info(`Setting parent task ${parentTaskId} to status: ${completedStatus}`);
+        logger.info(`🎯 All subtasks completed! Setting parent task ${parentTaskId} to status: ${completedStatus}`);
+        
         await this.api.updateTaskStatus(parentTaskId, completedStatus);
         
         logger.info(`✅ Auto-completed parent task ${parentTaskId} (${parentTask.name}) - all ${subtasks.length} subtasks done!`);
       } else if (!allSubtasksCompleted && !parentCompleted) {
-        // Check if any subtask is in progress
+        // Some subtasks still pending - ensure parent is in progress
         const inProgressStatuses = ['in progress', 'fixing', 'in_progress'];
         const hasActiveSubtask = subtasks.some(t => 
           inProgressStatuses.includes(t.status.status.toLowerCase())

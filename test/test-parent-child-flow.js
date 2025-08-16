@@ -28,9 +28,9 @@ console.log('🧪 Testing Parent-Child Task Flow with Auto-Completion\n');
 console.log(`📍 Using list: ${LIST_ID}`);
 console.log('─'.repeat(60));
 
-async function cleanupTestTasks(api, listId) {
+async function cleanupTestTasks(api, listId, syncHandler) {
   console.log('\n🧹 Cleaning up existing test tasks...');
-  const tasks = await api.getTasks(listId, true);
+  const tasks = await api.getTasks(listId, true, true); // Force refresh
   const testTasks = tasks.filter(t => 
     t.tags?.some(tag => tag.name === 'test-parent-child') ||
     t.name.includes('[TEST]')
@@ -45,6 +45,12 @@ async function cleanupTestTasks(api, listId) {
     }
   }
   
+  // Clear the sync handler's task mappings
+  if (syncHandler) {
+    const mappings = syncHandler.getAllMappings();
+    mappings.clear();
+  }
+  
   if (testTasks.length > 0) {
     console.log(`  ✅ Cleaned up ${testTasks.length} test tasks\n`);
   }
@@ -56,7 +62,7 @@ async function testParentChildFlow() {
   await syncHandler.initialize();
   
   // Clean up first
-  await cleanupTestTasks(api, LIST_ID);
+  await cleanupTestTasks(api, LIST_ID, syncHandler);
   
   // Create test todos simulating TodoWrite structure
   const timestamp = Date.now();
@@ -102,14 +108,19 @@ async function testParentChildFlow() {
     // Wait for sync to complete
     await new Promise(resolve => setTimeout(resolve, 3000));
     
-    // Verify creation
-    let tasks = await api.getTasks(LIST_ID, true);
+    // Verify creation - force refresh to get fresh data
+    let tasks = await api.getTasks(LIST_ID, true, true);
     const createdParent = tasks.find(t => t.name === parentTodo.content);
     const createdSub1 = tasks.find(t => t.name === subtask1.content);
     const createdSub2 = tasks.find(t => t.name === subtask2.content);
     const createdSub3 = tasks.find(t => t.name === subtask3.content);
     
     if (!createdParent || !createdSub1 || !createdSub2 || !createdSub3) {
+      console.log(`  Found ${tasks.length} total tasks`);
+      console.log(`  Parent found: ${!!createdParent}`);
+      console.log(`  Sub1 found: ${!!createdSub1}`);
+      console.log(`  Sub2 found: ${!!createdSub2}`);
+      console.log(`  Sub3 found: ${!!createdSub3}`);
       throw new Error('Failed to create all tasks');
     }
     
@@ -132,7 +143,7 @@ async function testParentChildFlow() {
     await new Promise(resolve => setTimeout(resolve, 3000));
     
     // Check parent status
-    tasks = await api.getTasks(LIST_ID, true);
+    tasks = await api.getTasks(LIST_ID, true, true); // Force refresh
     const parentAfterStart = tasks.find(t => t.name === parentTodo.content);
     console.log(`  Parent status after subtask starts: ${parentAfterStart.status.status}`);
     console.log(`  Expected: "in progress" or similar`);
@@ -149,7 +160,7 @@ async function testParentChildFlow() {
     await syncHandler.syncTodos([subtask1]);
     await new Promise(resolve => setTimeout(resolve, 2000));
     
-    tasks = await api.getTasks(LIST_ID, true);
+    tasks = await api.getTasks(LIST_ID, true, true); // Force refresh
     const parentAfterOne = tasks.find(t => t.name === parentTodo.content);
     console.log(`  Parent status: ${parentAfterOne.status.status}`);
     console.log('  Expected: Still "in progress" (other subtasks pending)');
@@ -164,7 +175,7 @@ async function testParentChildFlow() {
     await syncHandler.syncTodos([subtask2]);
     await new Promise(resolve => setTimeout(resolve, 2000));
     
-    tasks = await api.getTasks(LIST_ID, true);
+    tasks = await api.getTasks(LIST_ID, true, true); // Force refresh
     const parentAfterTwo = tasks.find(t => t.name === parentTodo.content);
     console.log(`  Parent status: ${parentAfterTwo.status.status}`);
     console.log('  Expected: Still "in progress" (one subtask remaining)');
@@ -181,7 +192,7 @@ async function testParentChildFlow() {
     
     // Final verification
     console.log('\n🔍 Final Verification:');
-    tasks = await api.getTasks(LIST_ID, true);
+    tasks = await api.getTasks(LIST_ID, true, true); // Force refresh
     
     const finalParent = tasks.find(t => t.name === parentTodo.content);
     const finalSub1 = tasks.find(t => t.name === subtask1.content);

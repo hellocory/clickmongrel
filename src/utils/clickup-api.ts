@@ -149,7 +149,16 @@ export class ClickUpAPI {
   }
 
   // Task methods
-  async getTasks(listId: string, includeSubtasks = true): Promise<ClickUpTask[]> {
+  async getTasks(listId: string, includeSubtasks = true, forceRefresh = false): Promise<ClickUpTask[]> {
+    // If not forcing refresh, check cache first
+    if (!forceRefresh) {
+      const cached = cache.getTasks(listId);
+      if (cached && cached.length > 0) {
+        logger.debug(`Returning ${cached.length} cached tasks for list ${listId}`);
+        return cached;
+      }
+    }
+    
     const response = await this.client.get(`/list/${listId}/task`, {
       params: {
         subtasks: includeSubtasks,  // Fixed parameter name to match API docs
@@ -158,13 +167,16 @@ export class ClickUpAPI {
       }
     });
     const tasks = response.data.tasks;
-    cache.setTasks(tasks);
+    cache.setTasks(tasks, listId);
+    logger.debug(`Fetched ${tasks.length} fresh tasks from ClickUp for list ${listId}`);
     return tasks;
   }
 
-  async getTask(taskId: string): Promise<ClickUpTask> {
-    const cached = cache.getTask(taskId);
-    if (cached) return cached;
+  async getTask(taskId: string, forceRefresh = false): Promise<ClickUpTask> {
+    if (!forceRefresh) {
+      const cached = cache.getTask(taskId);
+      if (cached) return cached;
+    }
 
     const response = await this.client.get(`/task/${taskId}?include_tags=true`);
     const task = response.data;
