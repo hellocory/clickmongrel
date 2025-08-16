@@ -37,6 +37,8 @@ BUILD_LOG="$LOGS_DIR/build.log"
 MCP_LOG="$LOGS_DIR/mcp-setup.log"
 GITHUB_LOG="$LOGS_DIR/github.log"
 CLAUDE_LOG="$LOGS_DIR/claude-commands.log"
+USER_LOG="$LOGS_DIR/user-actions.log"
+SUMMARY_LOG="$LOGS_DIR/test-summary.log"
 
 # Functions
 log() {
@@ -177,15 +179,18 @@ create_github_repo() {
     rm -rf .git
     echo "=== Git Initialization ===" >> "$FULL_OUTPUT"
     git init 2>&1 | tee -a "$GITHUB_LOG" | tee -a "$FULL_OUTPUT" >> "$LOG_FILE"
+    git config user.email "test@clickmongrel.com"
+    git config user.name "ClickMongrel Test"
+    git branch -M main
     git remote add origin "https://github.com/$GITHUB_USER/$TEST_REPO_NAME.git"
     git add .
     git commit -m "Initial test setup for $TEST_RUN_ID" 2>&1 | tee -a "$GITHUB_LOG" | tee -a "$FULL_OUTPUT" >> "$LOG_FILE"
     
     # Try to push (may fail if repo doesn't exist)
     if git push -u origin main --force 2>&1 | tee -a "$GITHUB_LOG" | tee -a "$FULL_OUTPUT" >> "$LOG_FILE"; then
-        success "Repository initialized"
+        success "Repository initialized and pushed"
     else
-        warning "Could not push to repository"
+        warning "Could not push to repository (non-critical)"
     fi
 }
 
@@ -224,6 +229,9 @@ run_claude_setup() {
     cd "$TEST_PROJECT"
     
     echo "=== Claude Commands Log ===" > "$CLAUDE_LOG"
+    echo "=== User Actions Log ===" > "$USER_LOG"
+    echo "Timestamp: $(date)" >> "$USER_LOG"
+    echo "" >> "$USER_LOG"
     
     # Create Claude command script
     cat > claude-setup.txt << EOF
@@ -252,8 +260,22 @@ EOF
     # Copy to logs directory
     cp claude-setup.txt "$CLAUDE_LOG"
     
+    # Log user actions expected
+    cat >> "$USER_LOG" << EOF
+Expected User Actions:
+1. Open Claude Code in test directory
+2. Execute: Initialize ClickUp with workspace "$CLICKUP_WORKSPACE"
+3. Execute: Create goal "ClickMongrel Integration Test Run"
+4. Execute: Create todo list with test tasks
+5. Execute: Sync todos to ClickUp
+6. Execute: Complete first subtask
+7. Execute: Create commit
+8. Execute: Generate status report
+EOF
+    
     log "Claude setup script created at: claude-setup.txt"
     log "Copy saved to: $CLAUDE_LOG"
+    log "User actions logged to: $USER_LOG"
     warning "Please run Claude Code and execute the commands in claude-setup.txt"
     
     # Open Claude in test directory
@@ -378,9 +400,46 @@ function cleanup {
 }
 
 generate_report() {
-    header "Generating Test Report"
+    header "Generating Comprehensive Test Report"
     
     REPORT_FILE="$RESULTS_DIR/test-report.md"
+    
+    # Generate comprehensive summary
+    echo "=== Test Summary ===" > "$SUMMARY_LOG"
+    echo "Test Run ID: $TEST_RUN_ID" >> "$SUMMARY_LOG"
+    echo "Date: $(date)" >> "$SUMMARY_LOG"
+    echo "" >> "$SUMMARY_LOG"
+    
+    # Check what was created
+    echo "=== Directories Created ===" >> "$SUMMARY_LOG"
+    if [ -d "$TEST_PROJECT/.claude/clickup" ]; then
+        echo "✓ .claude/clickup/" >> "$SUMMARY_LOG"
+        ls -la "$TEST_PROJECT/.claude/clickup/" 2>/dev/null >> "$SUMMARY_LOG"
+    fi
+    if [ -d "$TEST_PROJECT/config" ]; then
+        echo "✓ config/" >> "$SUMMARY_LOG"
+        ls -la "$TEST_PROJECT/config/" 2>/dev/null >> "$SUMMARY_LOG"
+    fi
+    echo "" >> "$SUMMARY_LOG"
+    
+    # Check configuration files
+    echo "=== Configuration Files ===" >> "$SUMMARY_LOG"
+    if [ -f "$TEST_PROJECT/.claude/clickup/config.json" ]; then
+        echo "✓ ClickUp config exists" >> "$SUMMARY_LOG"
+        echo "Content preview:" >> "$SUMMARY_LOG"
+        cat "$TEST_PROJECT/.claude/clickup/config.json" 2>/dev/null | jq '.' | head -15 >> "$SUMMARY_LOG"
+    fi
+    echo "" >> "$SUMMARY_LOG"
+    
+    # Check MCP status
+    echo "=== MCP Status ===" >> "$SUMMARY_LOG"
+    claude mcp list | grep clickmongrel >> "$SUMMARY_LOG" 2>/dev/null || echo "No MCP found" >> "$SUMMARY_LOG"
+    echo "" >> "$SUMMARY_LOG"
+    
+    # Log files created
+    echo "=== Log Files Created ===" >> "$SUMMARY_LOG"
+    ls -la "$LOGS_DIR/" 2>/dev/null >> "$SUMMARY_LOG"
+    echo "" >> "$SUMMARY_LOG"
     
     cat > "$REPORT_FILE" << EOF
 # Test Run Report: $TEST_RUN_ID
@@ -397,31 +456,68 @@ generate_report() {
 - Workspace: $CLICKUP_WORKSPACE
 - Space: $CLICKUP_SPACE
 
-## Test Execution Log
+## Project Structure Created
+
+### Directories
 \`\`\`
-$(tail -50 "$LOG_FILE")
+$(cd "$TEST_PROJECT" && find .claude config -type d 2>/dev/null | sort)
+\`\`\`
+
+### Files
+\`\`\`
+$(cd "$TEST_PROJECT" && find .claude config -type f 2>/dev/null | sort)
+\`\`\`
+
+## MCP Integration Status
+\`\`\`
+$(claude mcp list | grep clickmongrel || echo "Not configured")
+\`\`\`
+
+## User Commands (Expected vs Actual)
+\`\`\`
+$(cat "$USER_LOG" 2>/dev/null || echo "No user actions logged")
+\`\`\`
+
+## ClickUp Resources Created
+- Space: ${CLICKUP_SPACE}
+- Lists: Tasks, Commits
+- Folders: Weekly Reports, Daily Reports, Docs
+- Templates: Commit templates configured
+
+## Test Logs Available
+\`\`\`
+$(ls -lh "$LOGS_DIR/" 2>/dev/null)
 \`\`\`
 
 ## Validation Results
 $(validate_setup 2>&1 || echo "Validation not completed")
 
-## Files Created
+## Summary
 \`\`\`
-$(find "$TEST_PROJECT/.claude" -type f 2>/dev/null | head -20)
+$(cat "$SUMMARY_LOG" 2>/dev/null || echo "Summary not available")
 \`\`\`
 
 ## Next Steps
 1. Review test results in: $RESULTS_DIR
-2. Check ClickUp for created tasks/commits
-3. Run cleanup if test is complete
+2. Check ClickUp workspace for created resources
+3. Review logs in: $LOGS_DIR
+4. Run cleanup when test is complete
 
 ---
 Generated: $(date)
 EOF
     
     success "Report generated: $REPORT_FILE"
-    log "Opening report..."
-    cat "$REPORT_FILE"
+    log "Summary saved to: $SUMMARY_LOG"
+    
+    # Display key summary points
+    echo ""
+    echo "=== FINAL TEST SUMMARY ==="
+    echo "Test Run: $TEST_RUN_ID"
+    echo "Logs: $LOGS_DIR"
+    echo "Results: $RESULTS_DIR"
+    echo ""
+    cat "$SUMMARY_LOG"
 }
 
 # Main execution
