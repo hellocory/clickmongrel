@@ -9,6 +9,8 @@ import {
   ErrorCode,
   McpError
 } from '@modelcontextprotocol/sdk/types.js';
+import { fileURLToPath } from 'url';
+import path from 'path';
 import configManager from './config/index.js';
 import SyncHandler from './handlers/sync.js';
 import GoalHandler from './handlers/goals.js';
@@ -19,6 +21,10 @@ import PlanHandler from './handlers/plans.js';
 import WorkflowHandler from './handlers/workflow.js';
 import logger from './utils/logger.js';
 import { TodoItem, ClickUpGoal } from './types/index.js';
+
+// Define __dirname for ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Get API key from environment or configuration
 const API_KEY = process.env.CLICKUP_API_KEY || configManager.getApiKey() || '';
