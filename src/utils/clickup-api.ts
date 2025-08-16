@@ -102,6 +102,20 @@ export class ClickUpAPI {
     return space;
   }
 
+  async createSpace(teamId: string, spaceData: {
+    name: string;
+    multiple_assignees?: boolean;
+    features?: any;
+  }): Promise<ClickUpSpace> {
+    const response = await this.client.post(`/team/${teamId}/space`, spaceData);
+    logger.info(`Created space "${spaceData.name}" in team ${teamId}`);
+    
+    // Clear the spaces cache since we added a new one
+    cache.clearSpaces();
+    
+    return response.data;
+  }
+
   // List methods
   async getLists(spaceId: string): Promise<ClickUpList[]> {
     const response = await this.client.get(`/space/${spaceId}/list`);
@@ -113,6 +127,14 @@ export class ClickUpAPI {
   async createList(spaceId: string, list: any): Promise<ClickUpList> {
     const response = await this.client.post(`/space/${spaceId}/list`, list);
     logger.info(`Created list: ${response.data.name}`);
+    return response.data;
+  }
+
+  async createFolder(spaceId: string, folderData: {
+    name: string;
+  }): Promise<any> {
+    const response = await this.client.post(`/space/${spaceId}/folder`, folderData);
+    logger.info(`Created folder "${folderData.name}" in space ${spaceId}`);
     return response.data;
   }
 
@@ -271,7 +293,15 @@ export class ClickUpAPI {
   // Status methods
   async getListStatuses(listId: string): Promise<ClickUpStatus[]> {
     const list = await this.getList(listId);
-    return list.statuses;
+    
+    // If list has override_statuses true and has statuses, use them
+    if (list.override_statuses && list.statuses) {
+      return list.statuses;
+    }
+    
+    // Otherwise, get the space statuses
+    const space = await this.getSpace(list.space.id);
+    return space.statuses || [];
   }
 
   async getSpaceStatuses(spaceId: string): Promise<ClickUpStatus[]> {

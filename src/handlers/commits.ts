@@ -3,6 +3,7 @@ import ClickUpAPI from '../utils/clickup-api.js';
 import TaskHandler from './tasks.js';
 import GoalHandler from './goals.js';
 import logger from '../utils/logger.js';
+import { StatusValidator } from '../utils/status-validator.js';
 import { execSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -28,6 +29,8 @@ export class CommitHandler {
   private taskHandler: TaskHandler;
   private goalHandler: GoalHandler;
   private commitsListId: string | null = null;
+  private statusValidator: StatusValidator;
+  private statusesValidated: boolean = false;
   private templates!: CommitTemplates;
   
   // Status lifecycle mapping - MUST match ClickUp statuses exactly (lowercase)
@@ -44,8 +47,23 @@ export class CommitHandler {
     this.api = new ClickUpAPI(apiKey);
     this.taskHandler = new TaskHandler(apiKey);
     this.goalHandler = new GoalHandler(apiKey);
+    this.statusValidator = new StatusValidator(apiKey);
     this.loadCommitsListId();
     this.loadTemplates();
+  }
+  
+  async initialize(): Promise<void> {
+    // Validate statuses if commits list is configured
+    if (this.commitsListId && !this.statusesValidated) {
+      try {
+        await this.statusValidator.validateListStatuses(this.commitsListId, 'commits');
+        this.statusesValidated = true;
+        logger.info('Commit handler initialized with validated statuses');
+      } catch (error: any) {
+        logger.error('Commit handler initialization failed - status validation error');
+        throw error;
+      }
+    }
   }
   
   private loadTemplates(): void {
@@ -100,6 +118,19 @@ export class CommitHandler {
 
   async linkCommit(commit: CommitInfo): Promise<void> {
     try {
+      // Validate statuses before allowing any commit tracking
+      if (this.commitsListId && !this.statusesValidated) {
+        try {
+          await this.statusValidator.validateListStatuses(this.commitsListId, 'commits');
+          this.statusesValidated = true;
+          logger.info('Commit status validation passed - proceeding with tracking');
+        } catch (error: any) {
+          // Status validation failed - cannot proceed
+          logger.error('Commit status validation failed - cannot track commits');
+          throw error;
+        }
+      }
+      
       // Create a task in the Commits list for tracking
       if (this.commitsListId) {
         await this.trackCommitAsTask(commit);
@@ -142,6 +173,17 @@ export class CommitHandler {
     if (!this.commitsListId) {
       logger.warn('No commits list configured');
       return;
+    }
+    
+    // Ensure statuses are validated
+    if (!this.statusesValidated) {
+      try {
+        await this.statusValidator.validateListStatuses(this.commitsListId, 'commits');
+        this.statusesValidated = true;
+      } catch (error: any) {
+        logger.error('Cannot track commit - status validation failed');
+        throw error;
+      }
     }
     
     try {

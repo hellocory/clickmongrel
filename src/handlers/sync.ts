@@ -3,6 +3,9 @@ import ClickUpAPI from '../utils/clickup-api.js';
 import configManager from '../config/index.js';
 import logger from '../utils/logger.js';
 import { TaskAnalyzer } from '../utils/task-analyzer.js';
+import { StatusValidator } from '../utils/status-validator.js';
+import * as fs from 'fs';
+import * as path from 'path';
 
 export class SyncHandler {
   private api: ClickUpAPI;
@@ -17,7 +20,12 @@ export class SyncHandler {
     this.syncInProgress = false;
     this.listId = listId;
     this.taskIdMap = new Map();
+    this.statusValidator = new StatusValidator(apiKey);
+    this.statusesValidated = false;
   }
+  
+  private statusValidator: StatusValidator;
+  private statusesValidated: boolean;
 
   async initialize(): Promise<void> {
     try {
@@ -28,26 +36,57 @@ export class SyncHandler {
         return;
       }
       
-      // Get default list ID
-      const workspaceId = configManager.getConfig().clickup.workspace_id;
-      const defaultSpace = configManager.getDefaultSpace();
-      const defaultList = configManager.getDefaultList();
+      // Try to get from environment variables first
+      const envListId = process.env.CLICKUP_TASKS_LIST_ID;
+      if (envListId) {
+        this.listId = envListId;
+        logger.info(`Using list ID from environment: ${this.listId}`);
+        await this.cacheListStatuses(this.listId);
+        return;
+      }
       
-      if (workspaceId && defaultSpace && defaultList) {
-        // Use the configured workspace ID directly
+      // Try to load from .claude/clickup/config.json
+      const configPath = path.join(process.cwd(), '.claude/clickup/config.json');
+      if (fs.existsSync(configPath)) {
+        try {
+          const configContent = fs.readFileSync(configPath, 'utf-8');
+          const config = JSON.parse(configContent);
+          
+          // Set auto-assign from config - FIXED to use correct user ID
+          if (config.autoAssign && config.userId) {
+            configManager.updateAssigneeConfig(true, config.userId);
+            logger.info(`Auto-assign enabled for user ID: ${config.userId}`);
+          }
+          
+          if (config.lists?.tasks) {
+            this.listId = config.lists.tasks;
+            logger.info(`Using list ID from config: ${this.listId}`);
+            if (this.listId) {
+              await this.cacheListStatuses(this.listId);
+            }
+            return;
+          }
+        } catch (e) {
+          logger.warn('Could not load config.json');
+        }
+      }
+      
+      // Fall back to workspace/space/list discovery
+      const workspaceId = process.env.CLICKUP_WORKSPACE_ID || configManager.getConfig().clickup.workspace_id;
+      const defaultSpace = process.env.CLICKUP_DEFAULT_SPACE || configManager.getDefaultSpace();
+      const defaultList = process.env.CLICKUP_DEFAULT_LIST || configManager.getDefaultList() || 'Tasks';
+      
+      if (workspaceId && defaultSpace) {
         const spaces = await this.api.getSpaces(workspaceId);
         const space = spaces.find(s => s.name === defaultSpace);
         
         if (space) {
-          // Get lists
           const lists = await this.api.getLists(space.id);
           const list = lists.find(l => l.name === defaultList);
           
           if (list) {
             this.listId = list.id;
             logger.info(`Initialized with list: ${list.name} (${list.id})`);
-            
-            // Cache the statuses for this list
             await this.cacheListStatuses(list.id);
           } else {
             logger.error(`List "${defaultList}" not found in space "${defaultSpace}"`);
@@ -112,6 +151,19 @@ export class SyncHandler {
       if (!this.listId) {
         logger.error('Cannot sync todos - no list ID available');
         return;
+      }
+    }
+    
+    // Validate statuses before allowing any sync
+    if (!this.statusesValidated && this.listId) {
+      try {
+        await this.statusValidator.validateListStatuses(this.listId, 'tasks');
+        this.statusesValidated = true;
+        logger.info('Status validation passed - proceeding with sync');
+      } catch (error: any) {
+        // Status validation failed - cannot proceed
+        logger.error('Status validation failed - cannot sync tasks');
+        throw error;
       }
     }
 

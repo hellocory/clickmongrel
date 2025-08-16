@@ -113,6 +113,7 @@ export interface ClickUpList {
     id: string;
     name: string;
   };
+  override_statuses?: boolean;
   statuses: ClickUpStatus[];
   custom_fields?: Array<{
     id: string;

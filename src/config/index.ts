@@ -76,6 +76,19 @@ export class ConfigManager {
     if (fs.existsSync(this.configPath)) {
       try {
         const fileConfig = JSON.parse(fs.readFileSync(this.configPath, 'utf-8'));
+        
+        // Convert new format to old format if needed
+        if (fileConfig.workspace && !fileConfig.clickup) {
+          defaultConfig.clickup.workspace_id = fileConfig.workspace.id || '90131285250'; // ALWAYS Ghost Codes
+          defaultConfig.clickup.workspace_name = fileConfig.workspace.name || "Ghost Codes's Workspace";
+        }
+        if (fileConfig.space) {
+          defaultConfig.clickup.default_space = fileConfig.space.name || 'Agentic Development';
+        }
+        if (fileConfig.lists?.tasks) {
+          defaultConfig.clickup.default_list = 'Tasks';
+        }
+        
         return { ...defaultConfig, ...fileConfig };
       } catch (error) {
         console.error('Error loading config file, using defaults:', error);

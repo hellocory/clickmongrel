@@ -53,6 +53,11 @@ class CacheManager {
     return keys.map(key => this.spaceCache.get<ClickUpSpace>(key)).filter(Boolean) as ClickUpSpace[];
   }
 
+  clearSpaces(): void {
+    this.spaceCache.flushAll();
+    logger.debug('Cleared space cache');
+  }
+
   // List caching
   setList(list: ClickUpList): void {
     this.cache.set(`list:${list.id}`, list, 1800); // 30 minutes

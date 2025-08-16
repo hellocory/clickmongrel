@@ -88,58 +88,59 @@ class ClickMongrelServer {
             required: ['todos']
           }
         },
-        {
-          name: 'get_current_goal',
-          description: 'Get the currently active goal',
-          inputSchema: {
-            type: 'object',
-            properties: {}
-          }
-        },
-        {
-          name: 'switch_goal',
-          description: 'Switch to a different goal',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              goal_id: { type: 'string' }
-            },
-            required: ['goal_id']
-          }
-        },
-        {
-          name: 'update_goal_progress',
-          description: 'Update progress for the current goal',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              percent: { type: 'number', minimum: 0, maximum: 100 }
-            },
-            required: ['percent']
-          }
-        },
-        {
-          name: 'list_goals',
-          description: 'List all available goals',
-          inputSchema: {
-            type: 'object',
-            properties: {}
-          }
-        },
-        {
-          name: 'create_goal',
-          description: 'Create a new goal',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              name: { type: 'string' },
-              description: { type: 'string' },
-              percent_completed: { type: 'number', minimum: 0, maximum: 100 },
-              color: { type: 'string' }
-            },
-            required: ['name']
-          }
-        },
+        // GOALS API DISABLED - Not using ClickUp Goals for now
+        // {
+        //   name: 'get_current_goal',
+        //   description: 'Get the currently active goal',
+        //   inputSchema: {
+        //     type: 'object',
+        //     properties: {}
+        //   }
+        // },
+        // {
+        //   name: 'switch_goal',
+        //   description: 'Switch to a different goal',
+        //   inputSchema: {
+        //     type: 'object',
+        //     properties: {
+        //       goal_id: { type: 'string' }
+        //     },
+        //     required: ['goal_id']
+        //   }
+        // },
+        // {
+        //   name: 'update_goal_progress',
+        //   description: 'Update progress for the current goal',
+        //   inputSchema: {
+        //     type: 'object',
+        //     properties: {
+        //       percent: { type: 'number', minimum: 0, maximum: 100 }
+        //     },
+        //     required: ['percent']
+        //   }
+        // },
+        // {
+        //   name: 'list_goals',
+        //   description: 'List all available goals',
+        //   inputSchema: {
+        //     type: 'object',
+        //     properties: {}
+        //   }
+        // },
+        // {
+        //   name: 'create_goal',
+        //   description: 'Create a new goal',
+        //   inputSchema: {
+        //     type: 'object',
+        //     properties: {
+        //       name: { type: 'string' },
+        //       description: { type: 'string' },
+        //       percent_completed: { type: 'number', minimum: 0, maximum: 100 },
+        //       color: { type: 'string' }
+        //     },
+        //     required: ['name']
+        //   }
+        // },
         {
           name: 'link_commit',
           description: 'Link a git commit to the current task',

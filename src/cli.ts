@@ -65,6 +65,7 @@ program
   .command('quick-setup')
   .description('Quick AI-friendly setup with optional space/folder')
   .option('--api-key <key>', 'ClickUp API key')
+  .option('--workspace <name>', 'Workspace name to use')
   .option('--space <id>', 'Space ID to use')
   .option('--folder <id>', 'Folder ID to use as primary')
   .action(async (options) => {
@@ -77,7 +78,7 @@ program
       process.exit(1);
     }
     
-    const setup = new QuickSetup(apiKey, options.space, options.folder);
+    const setup = new QuickSetup(apiKey, options.workspace, options.space, options.folder);
     await setup.setup();
   });
 
@@ -340,6 +341,15 @@ program
       console.error(chalk.red('Error:'), error);
       process.exit(1);
     }
+  });
+
+// Check statuses command
+program
+  .command('check-statuses')
+  .description('Check if ClickUp statuses are properly configured')
+  .action(async () => {
+    const { default: checkStatuses } = await import('./cli-check-statuses.js');
+    await checkStatuses();
   });
 
 // Test command

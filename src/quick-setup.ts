@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import chalk from 'chalk';
 import ClickUpAPI from './utils/clickup-api.js';
+import { WorkspaceResolver } from './utils/workspace-resolver.js';
+import logger from './utils/logger.js';
 import * as fs from 'fs';
 import * as path from 'path';
 import { ClickUpSpace, ClickUpList } from './types/index.js';
@@ -11,9 +13,12 @@ import { ClickUpSpace, ClickUpList } from './types/index.js';
  */
 export class QuickSetup {
   private api: ClickUpAPI;
+  private resolver: WorkspaceResolver;
   private config: {
     apiKey: string;
+    userId?: number;
     workspaceId?: string;
+    workspaceName?: string;
     spaceId?: string;
     spaceName?: string;
     folderId?: string;
@@ -24,10 +29,12 @@ export class QuickSetup {
     };
   };
 
-  constructor(apiKey: string, spaceId?: string, folderId?: string) {
+  constructor(apiKey: string, workspaceName?: string, spaceId?: string, folderId?: string) {
     this.api = new ClickUpAPI(apiKey);
+    this.resolver = new WorkspaceResolver(apiKey);
     this.config = {
       apiKey,
+      workspaceName,
       spaceId,
       folderId
     };
@@ -75,11 +82,30 @@ export class QuickSetup {
     const user = await this.api.getCurrentUser();
     console.log(chalk.green(`✓ Connected as: ${user.username}`));
     
-    // Get workspace info
-    const teams = await this.api.getTeams();
-    if (teams.length > 0) {
-      this.config.workspaceId = teams[0]?.id;
-      console.log(chalk.gray(`  Workspace: ${teams[0]?.name}`));
+    // Store user ID for auto-assignment
+    this.config.userId = user.id;
+    console.log(chalk.gray(`  Auto-assign enabled for: ${user.username}`));
+    
+    // If workspace name is provided, find it
+    if (this.config.workspaceName) {
+      const workspace = await this.resolver.findWorkspaceByName(this.config.workspaceName);
+      if (workspace) {
+        this.config.workspaceId = workspace.id;
+        this.config.workspaceName = workspace.name;
+        console.log(chalk.gray(`  Workspace: ${workspace.name}`));
+      } else {
+        console.log(chalk.yellow(`  Could not find workspace "${this.config.workspaceName}", will use first available`));
+      }
+    }
+    
+    // Fall back to first workspace if not found
+    if (!this.config.workspaceId) {
+      const teams = await this.api.getTeams();
+      if (teams.length > 0) {
+        this.config.workspaceId = teams[0]?.id;
+        this.config.workspaceName = teams[0]?.name;
+        console.log(chalk.gray(`  Workspace: ${teams[0]?.name}`));
+      }
     }
   }
 
@@ -287,51 +313,60 @@ export class QuickSetup {
    * Create Commits list with specific statuses
    */
   private async createCommitsList(): Promise<ClickUpList> {
-    const listData = {
+    // Create list without custom statuses first
+    const list = await this.api.createList(this.config.spaceId!, {
       name: 'Commits',
-      content: 'Git commit tracking',
-      status: [
-        { status: 'development', color: '#87909e', type: 'custom', orderindex: 0 },
-        { status: 'error', color: '#ff5733', type: 'custom', orderindex: 1 },
-        { status: 'prototype', color: '#ffab00', type: 'custom', orderindex: 2 },
-        { status: 'production', color: '#02c852', type: 'custom', orderindex: 3 }
-      ]
-    };
+      content: 'Git commit tracking'
+    });
 
-    return await this.api.makeRequest(
-      `/space/${this.config.spaceId}/list`,
-      'POST',
-      listData
-    );
+    // Note: Custom statuses must be added manually in ClickUp UI
+    // The API doesn't support adding custom statuses to lists
+    logger.info('Note: Add custom statuses (development, error, prototype, production) manually in ClickUp');
+    
+    return list;
   }
 
   /**
    * Create Tasks list with specific statuses
    */
   private async createTasksList(): Promise<ClickUpList> {
-    const listData = {
+    // Create list first (don't include status field at all)
+    const list = await this.api.createList(this.config.spaceId!, {
       name: 'Tasks',
-      content: 'Task and goal management',
-      status: [
-        { status: 'to do', color: '#87909e', type: 'custom', orderindex: 0 },
-        { status: 'future', color: '#4194f6', type: 'custom', orderindex: 1 },
-        { status: 'in progress', color: '#ffab00', type: 'custom', orderindex: 2 },
-        { status: 'fixing', color: '#ff8c00', type: 'custom', orderindex: 3 },
-        { status: 'completed', color: '#02c852', type: 'custom', orderindex: 4 }
-      ]
-    };
+      content: 'Task and goal management'
+      // Note: 'status' field is for list color, not task statuses
+    });
 
-    return await this.api.makeRequest(
-      `/space/${this.config.spaceId}/list`,
-      'POST',
-      listData
-    );
+    // Try to create custom statuses for the list
+    // Note: This requires creating statuses separately via the status API
+    try {
+      await this.createListStatuses(list.id);
+    } catch (e) {
+      logger.info('Note: Add custom statuses (to do, in progress, completed) manually in ClickUp');
+    }
+    
+    return list;
+  }
+
+  /**
+   * Create custom statuses for a list
+   */
+  private async createListStatuses(_listId: string): Promise<void> {
+    // The ClickUp API for creating custom statuses is limited
+    // Statuses are typically inherited from the space
+    // Lists will use the default space statuses
+    
+    // Note: The actual API endpoint for creating statuses is not publicly documented
+    // or requires specific permissions. Lists typically inherit space statuses.
+    logger.info('Custom statuses should be configured in ClickUp UI for best results');
   }
 
   /**
    * Save configuration to project
    */
   private async saveProjectConfig(): Promise<void> {
+    // Also copy the status setup guide
+    await this.copyStatusGuide();
     const projectRoot = process.cwd();
     const claudeDir = path.join(projectRoot, '.claude');
     const clickupDir = path.join(claudeDir, 'clickup');
@@ -361,9 +396,11 @@ export class QuickSetup {
     // Save config
     const config = {
       apiKey: this.config.apiKey,
+      userId: this.config.userId,
+      autoAssign: true,
       workspace: {
         id: this.config.workspaceId,
-        name: 'Active Workspace'
+        name: this.config.workspaceName || 'Active Workspace'
       },
       space: {
         id: this.config.spaceId,
@@ -405,6 +442,65 @@ export class QuickSetup {
   }
 
   /**
+   * Copy status setup guide to project
+   */
+  private async copyStatusGuide(): Promise<void> {
+    try {
+      const projectRoot = process.cwd();
+      const claudeDir = path.join(projectRoot, '.claude');
+      const clickupDir = path.join(claudeDir, 'clickup');
+      
+      // Ensure directory exists
+      if (!fs.existsSync(clickupDir)) {
+        fs.mkdirSync(clickupDir, { recursive: true });
+      }
+      
+      // Copy the status guide
+      const guidePath = path.join(clickupDir, 'STATUS_SETUP_GUIDE.md');
+      
+      // Try to find the template
+      let templateContent = `# Status Setup Guide
+
+Please configure your ClickUp lists with custom statuses:
+
+## Tasks List Statuses:
+- TO DO (gray)
+- FUTURE (blue) 
+- IN PROGRESS (yellow)
+- FIXING (orange)
+- COMPLETED (green)
+
+## Commits List Statuses:
+- development update (gray)
+- development push (blue)
+- upstream merge (purple)
+- merged (green)
+- production/testing (yellow)
+- production/staging (orange)
+- production/final (green)
+
+See the full guide at: https://github.com/hellocory/clickmongrel/docs/STATUS_SETUP.md
+`;
+      
+      // Try to read the actual template if it exists
+      try {
+        const actualTemplatePath = path.join(__dirname, '..', 'templates', 'STATUS_SETUP_GUIDE.md');
+        if (fs.existsSync(actualTemplatePath)) {
+          templateContent = fs.readFileSync(actualTemplatePath, 'utf-8');
+        }
+      } catch (e) {
+        // Use default content
+      }
+      
+      fs.writeFileSync(guidePath, templateContent);
+      console.log(chalk.green('✓ Status setup guide saved to: .claude/clickup/STATUS_SETUP_GUIDE.md'));
+      console.log(chalk.yellow('\n⚠️  IMPORTANT: Read STATUS_SETUP_GUIDE.md to configure ClickUp statuses!'));
+    } catch (error) {
+      console.log(chalk.yellow('Could not copy status guide'));
+    }
+  }
+
+  /**
    * Display setup summary
    */
   private displaySummary(): void {
@@ -426,6 +522,19 @@ export class QuickSetup {
     
     console.log(chalk.cyan('\n🤖 For AI to switch spaces:'));
     console.log('Run: clickmongrel quick-setup --space <space-id>');
+    
+    console.log(chalk.red.bold('\n⚠️  CRITICAL: Configure ClickUp Statuses!'));
+    console.log(chalk.red('The system will NOT work until you configure custom statuses.'));
+    console.log('');
+    console.log(chalk.yellow('Required steps:'));
+    console.log(chalk.yellow('1. Open .claude/clickup/STATUS_SETUP_GUIDE.md'));
+    console.log(chalk.yellow('2. Go to ClickUp and configure custom statuses for both lists'));
+    console.log(chalk.yellow('3. Run: clickmongrel check-statuses (to verify)'));
+    console.log('');
+    console.log(chalk.red.bold('Without proper statuses:'));
+    console.log(chalk.red('  ❌ Task syncing will fail'));
+    console.log(chalk.red('  ❌ Commit tracking will fail'));
+    console.log(chalk.red('  ❌ All operations will be blocked'));
   }
 }
 
