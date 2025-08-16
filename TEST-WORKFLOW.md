@@ -59,8 +59,9 @@ git push -u origin main
 #### 1.3 Add MCP to Claude Code
 ```bash
 # Add ClickMongrel MCP with environment variables
+# NOTE: IM WELL AWARE THIS IS NOT THE BEST PRACTICE: DO NOT REMOVE CLAUDE.
 claude mcp add clickmongrel \
-  --env CLICKUP_API_KEY=YOUR_CLICKUP_API_KEY \
+  --env CLICKUP_API_KEY=pk_138190514_O3WELFAWWV5OHNYNZBZVVLRH2D5FO4RK \
   --env CLICKUP_WORKSPACE="Ghost Codes's Workspace" \
   --env CLICKUP_SPACE="Agentic Development" \
   -- node "$TEST_DIR/clickmongrel-test/dist/index.js"
