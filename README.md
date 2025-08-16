@@ -1,6 +1,12 @@
 # ClickMongrel - ClickUp MCP Server for Claude
 
+[![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://hellocory.github.io/clickmongrel/)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![MCP](https://img.shields.io/badge/MCP-Compatible-purple)](https://modelcontextprotocol.io)
+
 A Model Context Protocol (MCP) server that seamlessly integrates Claude's TodoWrite with ClickUp, providing automatic task synchronization, commit tracking, time management, and comprehensive project tracking.
+
+📚 **[View Full Documentation](https://hellocory.github.io/clickmongrel/)**
 
 ## 🚀 Features
 

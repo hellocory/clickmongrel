@@ -11,11 +11,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/clickmongrel.git"
+    "url": "https://github.com/hellocory/clickmongrel.git"
   },
-  "homepage": "https://github.com/yourusername/clickmongrel#readme",
+  "homepage": "https://hellocory.github.io/clickmongrel/",
   "bugs": {
-    "url": "https://github.com/yourusername/clickmongrel/issues"
+    "url": "https://github.com/hellocory/clickmongrel/issues"
   },
   "scripts": {
     "build": "tsc",

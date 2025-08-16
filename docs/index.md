@@ -46,7 +46,7 @@ title: ClickMongrel MCP Server
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/clickmongrel.git
+git clone https://github.com/hellocory/clickmongrel.git
 cd clickmongrel
 
 # Install dependencies
@@ -98,13 +98,12 @@ This project is licensed under the MIT License - see the [LICENSE](./LICENSE) fi
 
 ## 🔗 Links
 
-- [GitHub Repository](https://github.com/yourusername/clickmongrel)
+- [GitHub Repository](https://github.com/hellocory/clickmongrel)
 - [NPM Package](https://www.npmjs.com/package/@clickmongrel/mcp-server)
 - [ClickUp API Documentation](https://clickup.com/api)
 - [MCP Documentation](https://modelcontextprotocol.io)
 
 ## 💬 Support
 
-- [Report Issues](https://github.com/yourusername/clickmongrel/issues)
-- [Discussions](https://github.com/yourusername/clickmongrel/discussions)
-- [Discord Community](https://discord.gg/clickmongrel)
+- [Report Issues](https://github.com/hellocory/clickmongrel/issues)
+- [Discussions](https://github.com/hellocory/clickmongrel/discussions)
