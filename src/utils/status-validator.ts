@@ -5,7 +5,7 @@ import chalk from 'chalk';
 export class StatusValidator {
   private api: ClickUpAPI;
   
-  // Required statuses for Tasks list (as shown in ClickUp)
+  // Required statuses for Tasks list (all lowercase in ClickUp)
   private static readonly REQUIRED_TASK_STATUSES = [
     'to do',
     'future',
@@ -17,7 +17,7 @@ export class StatusValidator {
   // Optional but recommended statuses for Tasks list
   private static readonly RECOMMENDED_TASK_STATUSES: string[] = [];
   
-  // Required statuses for Commits list (as shown in ClickUp)
+  // Required statuses for Commits list (all lowercase in ClickUp)
   private static readonly REQUIRED_COMMIT_STATUSES = [
     'comitted',
     'developing',
