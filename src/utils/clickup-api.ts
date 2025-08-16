@@ -153,7 +153,7 @@ export class ClickUpAPI {
       due_date: task.due_date,
       start_date: task.start_date,
       time_estimate: task.time_estimate,
-      assignees: task.assignees?.map(a => a.id),
+      assignees: task.assignees, // Already an array of IDs from sync handler
       tags: task.tags, // Added tags!
       custom_fields: task.custom_fields
     });
@@ -278,6 +278,17 @@ export class ClickUpAPI {
   async getCustomFields(listId: string): Promise<unknown[]> {
     const response = await this.client.get(`/list/${listId}/field`);
     return response.data.fields;
+  }
+
+  async createCustomField(listId: string, field: {
+    name: string;
+    type: string;
+    description?: string;
+    required?: boolean;
+  }): Promise<any> {
+    const response = await this.client.post(`/list/${listId}/field`, field);
+    logger.info(`Created custom field "${field.name}" in list ${listId}`);
+    return response.data;
   }
 
   async updateCustomField(taskId: string, fieldId: string, value: string | number | boolean): Promise<void> {

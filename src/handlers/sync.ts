@@ -9,13 +9,14 @@ export class SyncHandler {
   private syncQueue: Map<string, TodoItem>;
   private syncInProgress: boolean;
   private listId: string | undefined;
-  private todoIdFieldId: string | undefined;
+  private taskIdMap: Map<string, string>; // Maps todo.id to ClickUp task.id
 
   constructor(apiKey: string, listId?: string) {
     this.api = new ClickUpAPI(apiKey);
     this.syncQueue = new Map();
     this.syncInProgress = false;
     this.listId = listId;
+    this.taskIdMap = new Map();
   }
 
   async initialize(): Promise<void> {
@@ -24,7 +25,6 @@ export class SyncHandler {
       if (this.listId) {
         logger.info(`Using provided list ID: ${this.listId}`);
         await this.cacheListStatuses(this.listId);
-        await this.detectCustomFields(this.listId);
         return;
       }
       
@@ -100,33 +100,6 @@ export class SyncHandler {
     }
   }
 
-  private async detectCustomFields(listId: string): Promise<void> {
-    try {
-      const customFields = await this.api.getCustomFields(listId) as any[];
-      
-      // Look for existing "Todo ID" or "Claude Todo ID" field
-      const todoField = customFields.find((field: any) => 
-        field.name?.toLowerCase().includes('todo') && 
-        field.name?.toLowerCase().includes('id')
-      );
-      
-      if (todoField) {
-        this.todoIdFieldId = todoField.id;
-        logger.info(`✓ Found Todo ID custom field: ${todoField.name} (${todoField.id})`);
-        logger.info('Claude can now perfectly track TodoWrite items with this custom field!');
-      } else {
-        logger.info('ℹ️  No Todo ID custom field detected.');
-        logger.info('📋 To improve Claude\'s relation capabilities:');
-        logger.info('   1. Go to your ClickUp list settings');
-        logger.info('   2. Create a custom field named "Claude Todo ID" (type: Text)');
-        logger.info('   3. Restart ClickMongrel to auto-detect it');
-        logger.info('');
-        logger.info('🔄 Fallback: Using task description to track TodoWrite IDs');
-      }
-    } catch (error) {
-      logger.warn('Failed to detect custom fields, using description fallback:', error);
-    }
-  }
 
   async syncTodos(todos: TodoItem[]): Promise<void> {
     if (!configManager.isFeatureEnabled('todo_sync')) {
@@ -290,17 +263,11 @@ export class SyncHandler {
       sections.push(`📅 **Created:** ${new Date(todo.created_at).toLocaleString()}`);
     }
     
-    // Add TodoWrite ID tracking
+    // Add metadata for tracking
     sections.push('');
     sections.push('---');
-    
-    if (this.todoIdFieldId) {
-      sections.push(`🔗 **TodoWrite ID:** ${todo.id}`);
-    } else {
-      sections.push(`🔗 **TodoWrite ID:** ${todo.id}`);
-      sections.push('');
-      sections.push('💡 **Tip:** Create a "Claude Todo ID" custom field in ClickUp for enhanced tracking!');
-    }
+    sections.push(`🤖 **Source:** Claude TodoWrite`);
+    sections.push(`📝 **Session ID:** ${todo.id}`);
     
     return sections.join('\n');
   }
@@ -321,20 +288,31 @@ export class SyncHandler {
       status: { status } as any
     };
 
-    // Add time estimate if available (in milliseconds)
+    // Add time estimate if available (keep in milliseconds as ClickUp expects)
     if (todo.estimated_time) {
       taskData.time_estimate = todo.estimated_time;
     }
 
-    // Add tags if available
+    // Add ALL tags from the todo
     if (todo.tags && todo.tags.length > 0) {
+      // ClickUp will create tags that don't exist
       taskData.tags = todo.tags;
+    } else {
+      // Add default tags based on source
+      taskData.tags = ['claude', 'todowrite'];
     }
 
     // Add priority as number (ClickUp format: 1=Urgent, 2=High, 3=Normal, 4=Low)
     if (todo.priority) {
-      const priorityMap = { urgent: 1, high: 2, normal: 3, low: 4 };
+      const priorityMap: Record<string, number> = { 
+        urgent: 1, 
+        high: 2, 
+        normal: 3, 
+        low: 4 
+      };
       taskData.priority = priorityMap[todo.priority] || 3;
+    } else {
+      taskData.priority = 3; // Default to normal
     }
 
     // Add due date based on priority
@@ -350,25 +328,35 @@ export class SyncHandler {
     
     // Add assignee if auto-assignment is enabled
     if (configManager.shouldAutoAssignUser()) {
-      const assigneeId = configManager.getAssigneeUserId();
+      let assigneeId = configManager.getAssigneeUserId();
+      
+      // If no assignee configured, get current user
+      if (!assigneeId) {
+        try {
+          const user = await this.api.getCurrentUser();
+          if (user && user.id) {
+            assigneeId = user.id;
+            // Save for future use
+            const config = configManager.getConfig();
+            config.clickup.assignee_user_id = user.id;
+            configManager.saveConfig(config);
+          }
+        } catch (error) {
+          logger.warn('Could not get current user for assignment', error);
+        }
+      }
+      
       if (assigneeId) {
         taskData.assignees = [assigneeId];
       }
     }
 
-    // Add custom field if available (preferred method)
-    if (this.todoIdFieldId) {
-      taskData.custom_fields = [
-        {
-          id: this.todoIdFieldId,
-          value: todo.id
-        }
-      ];
-    }
+    // No need for custom fields - we'll track the mapping internally
     
     const task = await this.api.createTask(this.listId, taskData);
 
-    // Update todo with ClickUp task ID
+    // Store the mapping between todo ID and ClickUp task ID
+    this.taskIdMap.set(todo.id, task.id);
     todo.clickup_task_id = task.id;
     logger.info(`Created ClickUp task ${task.id} for todo ${todo.id}`);
   }
@@ -382,10 +370,9 @@ export class SyncHandler {
       logger.info(`Updated task ${task.id} status from ${currentStatus} to ${newStatus}`);
     }
 
-    // Update todo with ClickUp task ID if not set
-    if (!todo.clickup_task_id) {
-      todo.clickup_task_id = task.id;
-    }
+    // Update mapping
+    this.taskIdMap.set(todo.id, task.id);
+    todo.clickup_task_id = task.id;
   }
 
   async syncTaskToTodo(taskId: string): Promise<TodoItem | null> {
@@ -419,6 +406,21 @@ export class SyncHandler {
   async forceSync(): Promise<void> {
     logger.info('Forcing sync of all cached todos');
     await this.processSyncQueue();
+  }
+
+  getTaskIdForTodo(todoId: string): string | undefined {
+    return this.taskIdMap.get(todoId);
+  }
+
+  getTodoIdForTask(taskId: string): string | undefined {
+    for (const [todoId, tId] of this.taskIdMap.entries()) {
+      if (tId === taskId) return todoId;
+    }
+    return undefined;
+  }
+
+  getAllMappings(): Map<string, string> {
+    return new Map(this.taskIdMap);
   }
 
   getSyncStatus(): { queueSize: number; inProgress: boolean; listId: string | undefined } {

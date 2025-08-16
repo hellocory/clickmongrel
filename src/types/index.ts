@@ -114,6 +114,15 @@ export interface ClickUpList {
     name: string;
   };
   statuses: ClickUpStatus[];
+  custom_fields?: Array<{
+    id: string;
+    name: string;
+    type: string;
+    type_config?: any;
+    date_created?: string;
+    hide_from_guests?: boolean;
+    required?: boolean;
+  }>;
 }
 
 export interface ClickUpGoal {
