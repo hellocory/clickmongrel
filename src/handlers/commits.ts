@@ -115,7 +115,7 @@ export class CommitHandler {
       const task = await this.api.createTask(this.commitsListId, {
         name: taskName,
         description: fullDescription,
-        status: { status, color: '#87909e', orderindex: 0, type: 'custom', id: status } as any
+        status
       } as any);
       
       logger.info(`Created commit task: ${taskName} (${task.id}) with status: ${status}`);
