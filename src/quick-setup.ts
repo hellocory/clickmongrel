@@ -91,8 +91,9 @@ export class QuickSetup {
       const workspace = await this.resolver.findWorkspaceByName(this.config.workspaceName);
       if (workspace) {
         this.config.workspaceId = workspace.id;
-        this.config.workspaceName = workspace.name;
-        console.log(chalk.gray(`  Workspace: ${workspace.name}`));
+        // Keep the user-provided name, don't use the API's version
+        // this.config.workspaceName = workspace.name;  // DON'T override
+        console.log(chalk.gray(`  Workspace: ${this.config.workspaceName}`));
       } else {
         console.log(chalk.yellow(`  Could not find workspace "${this.config.workspaceName}", will use first available`));
       }
@@ -103,8 +104,11 @@ export class QuickSetup {
       const teams = await this.api.getTeams();
       if (teams.length > 0) {
         this.config.workspaceId = teams[0]?.id;
-        this.config.workspaceName = teams[0]?.name;
-        console.log(chalk.gray(`  Workspace: ${teams[0]?.name}`));
+        // If no workspace name was provided, use the API's name
+        if (!this.config.workspaceName) {
+          this.config.workspaceName = teams[0]?.name;
+        }
+        console.log(chalk.gray(`  Workspace: ${this.config.workspaceName}`));
       }
     }
   }

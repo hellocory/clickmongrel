@@ -642,10 +642,13 @@ class ClickMongrelServer {
                 { cwd, encoding: 'utf-8' }
               );
               
+              // Use the user-provided workspace name, not the API's version
+              const displayWorkspace = workspace;
+              
               return {
                 content: [{
                   type: 'text',
-                  text: `✅ ClickUp integration initialized!\n\nWorkspace: ${workspace}\nSpace: ${projectName}\nList: Tasks\n\n✨ Features enabled:\n- TodoWrite sync\n- Commit tracking\n- Goal tracking\n\n${result}`
+                  text: `✅ ClickUp integration initialized!\n\nWorkspace: ${displayWorkspace}\nSpace: ${projectName}\nList: Tasks\n\n✨ Features enabled:\n- TodoWrite sync\n- Commit tracking\n- Goal tracking\n\n${result}`
                 }]
               };
             } catch (error: any) {
