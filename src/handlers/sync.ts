@@ -342,16 +342,33 @@ export class SyncHandler {
     
     // If this todo has a parent, find the parent task ID
     if (todo.parent_id) {
-      // Get existing tasks to find the parent
-      const existingTasks = await this.api.getTasks(this.listId!);
-      const parentTask = existingTasks.find(t => 
-        t.custom_fields?.find(f => f.name === 'todo_id')?.value === todo.parent_id ||
-        t.name === todo.parent_id
-      );
+      // First check our internal mapping
+      const parentClickUpId = this.taskIdMap.get(todo.parent_id);
       
-      if (parentTask) {
-        taskData.parent = parentTask.id;
-        logger.info(`Setting parent task ${parentTask.id} for subtask ${todo.content}`);
+      if (parentClickUpId) {
+        taskData.parent = parentClickUpId;
+        logger.info(`Setting parent task ${parentClickUpId} for subtask ${todo.content} using cached mapping`);
+      } else {
+        // Fallback: Get existing tasks to find the parent
+        const existingTasks = await this.api.getTasks(this.listId!);
+        
+        // Look for a task whose name matches the parent todo's content
+        // We need to find the parent todo first
+        const parentTodo = Array.from(this.syncQueue.values()).find(t => t.id === todo.parent_id);
+        const parentContent = parentTodo?.content || todo.parent_id;
+        
+        const parentTask = existingTasks.find(t => 
+          t.name === parentContent ||
+          t.name.includes(parentContent)
+        );
+        
+        if (parentTask) {
+          taskData.parent = parentTask.id;
+          this.taskIdMap.set(todo.parent_id, parentTask.id); // Cache for future use
+          logger.info(`Setting parent task ${parentTask.id} for subtask ${todo.content}`);
+        } else {
+          logger.warn(`Could not find parent task for ${todo.content} with parent_id ${todo.parent_id}`);
+        }
       }
     }
 
