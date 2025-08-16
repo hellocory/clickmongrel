@@ -222,8 +222,24 @@ export class SyncHandler {
 
       for (const todo of todos) {
         try {
-          const existingTask = taskMap.get(todo.id) || 
-                              existingTasks.find(t => t.name === todo.content);
+          // First check if we already have this todo mapped to a ClickUp task
+          const mappedTaskId = this.taskIdMap.get(todo.id);
+          let existingTask = null;
+          
+          if (mappedTaskId) {
+            // We have a mapping, try to find the task
+            existingTask = existingTasks.find(t => t.id === mappedTaskId);
+            if (!existingTask) {
+              // Mapping exists but task not found, clear the mapping
+              this.taskIdMap.delete(todo.id);
+            }
+          }
+          
+          // If no mapped task, look for it by other means
+          if (!existingTask) {
+            existingTask = taskMap.get(todo.id) || 
+                          existingTasks.find(t => t.name === todo.content);
+          }
 
           if (existingTask) {
             // Update existing task
