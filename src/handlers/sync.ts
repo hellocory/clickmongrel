@@ -2,6 +2,7 @@ import { TodoItem, ClickUpTask } from '../types/index.js';
 import ClickUpAPI from '../utils/clickup-api.js';
 import configManager from '../config/index.js';
 import logger from '../utils/logger.js';
+import { TaskAnalyzer } from '../utils/task-analyzer.js';
 
 export class SyncHandler {
   private api: ClickUpAPI;
@@ -140,13 +141,43 @@ export class SyncHandler {
       }
     }
 
-    // Add todos to sync queue
-    todos.forEach(todo => {
+    // Analyze and enhance todos with metadata
+    const enhancedTodos = todos.map(todo => {
+      const analyzed = TaskAnalyzer.analyzeTodo(todo);
+      this.trackTimeChanges(todo, analyzed);
+      return analyzed;
+    });
+
+    // Add enhanced todos to sync queue
+    enhancedTodos.forEach(todo => {
       this.syncQueue.set(todo.id, todo);
     });
 
     // Process sync queue
     await this.processSyncQueue();
+  }
+
+  private trackTimeChanges(original: TodoItem, analyzed: TodoItem): void {
+    // Log time tracking events
+    if (analyzed.started_at && !original.started_at) {
+      logger.info(`⏱️ Task started: ${analyzed.title || analyzed.content} (${analyzed.id})`);
+    }
+    
+    if (analyzed.completed_at && !original.completed_at) {
+      const duration = analyzed.actual_time ? TaskAnalyzer.formatDuration(analyzed.actual_time) : 'unknown';
+      const estimated = analyzed.estimated_time ? TaskAnalyzer.formatDuration(analyzed.estimated_time) : 'not estimated';
+      const efficiency = analyzed.actual_time && analyzed.estimated_time 
+        ? TaskAnalyzer.calculateEfficiency(analyzed.estimated_time, analyzed.actual_time)
+        : null;
+      
+      logger.info(`✅ Task completed: ${analyzed.title || analyzed.content} (${analyzed.id})`);
+      logger.info(`   Duration: ${duration} | Estimated: ${estimated}${efficiency ? ` | Efficiency: ${efficiency}%` : ''}`);
+    }
+
+    // Log metadata detection
+    if (analyzed.category && analyzed.category !== 'general') {
+      logger.debug(`🏷️ Task categorized as: ${analyzed.category} with tags: ${analyzed.tags?.join(', ')}`);
+    }
   }
 
   private async processSyncQueue(): Promise<void> {
@@ -195,19 +226,82 @@ export class SyncHandler {
     }
   }
 
+  private buildTaskDescription(todo: TodoItem): string {
+    const sections: string[] = [];
+    
+    // Header
+    sections.push('📝 **Created from Claude TodoWrite**');
+    sections.push('');
+    
+    // Basic info
+    if (todo.category && todo.category !== 'general') {
+      sections.push(`📂 **Category:** ${todo.category}`);
+    }
+    
+    if (todo.tags && todo.tags.length > 0) {
+      sections.push(`🏷️ **Tags:** ${todo.tags.join(', ')}`);
+    }
+    
+    if (todo.priority && todo.priority !== 'normal') {
+      const priorityEmoji = { urgent: '🔥', high: '⚡', low: '📋' };
+      sections.push(`${priorityEmoji[todo.priority] || '📋'} **Priority:** ${todo.priority}`);
+    }
+    
+    // Time tracking
+    if (todo.estimated_time) {
+      sections.push(`⏱️ **Estimated Time:** ${TaskAnalyzer.formatDuration(todo.estimated_time)}`);
+    }
+    
+    if (todo.created_at) {
+      sections.push(`📅 **Created:** ${new Date(todo.created_at).toLocaleString()}`);
+    }
+    
+    // Add TodoWrite ID tracking
+    sections.push('');
+    sections.push('---');
+    
+    if (this.todoIdFieldId) {
+      sections.push(`🔗 **TodoWrite ID:** ${todo.id}`);
+    } else {
+      sections.push(`🔗 **TodoWrite ID:** ${todo.id}`);
+      sections.push('');
+      sections.push('💡 **Tip:** Create a "Claude Todo ID" custom field in ClickUp for enhanced tracking!');
+    }
+    
+    return sections.join('\n');
+  }
+
   private async createTaskFromTodo(todo: TodoItem): Promise<void> {
     if (!this.listId) return;
 
     const status = configManager.getStatusMapping(todo.status);
     
+    // Use enhanced title and create rich description
+    const title = todo.title || todo.content;
+    const description = this.buildTaskDescription(todo);
+    
     // Prepare task data
     const taskData: any = {
-      name: todo.content,
-      description: this.todoIdFieldId 
-        ? `Created from Claude TodoWrite\nTodo ID: ${todo.id}`
-        : `Created from Claude TodoWrite\n\n🔗 TodoWrite ID: ${todo.id}\n\nNote: Create a "Claude Todo ID" custom field in ClickUp for better tracking!`,
+      name: title,
+      description,
       status: { status } as any
     };
+
+    // Add time estimate if available
+    if (todo.estimated_time) {
+      taskData.time_estimate = todo.estimated_time;
+    }
+
+    // Add due date based on priority
+    if (todo.priority === 'urgent') {
+      const dueDate = new Date();
+      dueDate.setHours(dueDate.getHours() + 4); // 4 hours for urgent
+      taskData.due_date = dueDate.getTime();
+    } else if (todo.priority === 'high') {
+      const dueDate = new Date();
+      dueDate.setDate(dueDate.getDate() + 1); // 1 day for high priority
+      taskData.due_date = dueDate.getTime();
+    }
     
     // Add custom field if available (preferred method)
     if (this.todoIdFieldId) {

@@ -145,6 +145,17 @@ export interface TodoItem {
   status: 'pending' | 'in_progress' | 'completed';
   clickup_task_id?: string;
   clickup_status_id?: string;
+  // Time tracking
+  created_at?: string;
+  started_at?: string;
+  completed_at?: string;
+  estimated_time?: number; // in milliseconds
+  actual_time?: number; // in milliseconds
+  // Enhanced metadata
+  title?: string; // Parsed from content
+  category?: string; // Auto-detected category
+  tags?: string[]; // Auto-generated tags
+  priority?: 'low' | 'normal' | 'high' | 'urgent';
 }
 
 export interface SyncConfig {
