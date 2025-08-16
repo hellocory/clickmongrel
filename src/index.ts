@@ -15,6 +15,7 @@ import GoalHandler from './handlers/goals.js';
 import TaskHandler from './handlers/tasks.js';
 import ReportHandler from './handlers/reports.js';
 import CommitHandler from './handlers/commits.js';
+import PlanHandler from './handlers/plans.js';
 import logger from './utils/logger.js';
 import { TodoItem, ClickUpGoal } from './types/index.js';
 
@@ -28,6 +29,7 @@ class ClickMongrelServer {
   private taskHandler: TaskHandler;
   private reportHandler: ReportHandler;
   private commitHandler: CommitHandler;
+  private planHandler: PlanHandler;
 
   constructor() {
     this.server = new Server(
@@ -49,6 +51,7 @@ class ClickMongrelServer {
     this.taskHandler = new TaskHandler(API_KEY);
     this.reportHandler = new ReportHandler(API_KEY);
     this.commitHandler = new CommitHandler(API_KEY);
+    this.planHandler = new PlanHandler(API_KEY);
 
     this.setupHandlers();
   }
@@ -199,6 +202,53 @@ class ClickMongrelServer {
               status: { type: 'string' }
             },
             required: ['task_id', 'status']
+          }
+        },
+        {
+          name: 'create_plan',
+          description: 'Create a plan with goal and subtasks from TodoWrite items',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              title: { type: 'string' },
+              todos: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    content: { type: 'string' },
+                    status: { type: 'string' }
+                  },
+                  required: ['id', 'content', 'status']
+                }
+              }
+            },
+            required: ['title', 'todos']
+          }
+        },
+        {
+          name: 'complete_plan_item',
+          description: 'Mark a plan item as complete and create commit',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              plan_id: { type: 'string' },
+              item_id: { type: 'string' },
+              commit_message: { type: 'string' }
+            },
+            required: ['plan_id', 'item_id']
+          }
+        },
+        {
+          name: 'get_plan_status',
+          description: 'Get the status of a plan',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              plan_id: { type: 'string' }
+            },
+            required: ['plan_id']
           }
         }
       ]
@@ -403,6 +453,43 @@ class ClickMongrelServer {
               content: [{
                 type: 'text',
                 text: `Updated task ${task.name} status to ${status}`
+              }]
+            };
+          }
+
+          case 'create_plan': {
+            const title = args?.title as string;
+            const todos = args?.todos as TodoItem[];
+            await this.planHandler.initialize();
+            const plan = await this.planHandler.createPlanFromTodos(title, todos);
+            return {
+              content: [{
+                type: 'text',
+                text: `Created plan "${plan.title}" with ${plan.items.length} subtasks\nGoal ID: ${plan.goalId}`
+              }]
+            };
+          }
+
+          case 'complete_plan_item': {
+            const planId = args?.plan_id as string;
+            const itemId = args?.item_id as string;
+            const commitMessage = args?.commit_message as string;
+            await this.planHandler.completePlanItem(planId, itemId, commitMessage);
+            return {
+              content: [{
+                type: 'text',
+                text: `Completed plan item ${itemId}`
+              }]
+            };
+          }
+
+          case 'get_plan_status': {
+            const planId = args?.plan_id as string;
+            const plan = this.planHandler.getPlanStatus(planId);
+            return {
+              content: [{
+                type: 'text',
+                text: JSON.stringify(plan, null, 2)
               }]
             };
           }

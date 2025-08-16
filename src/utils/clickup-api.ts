@@ -200,7 +200,7 @@ export class ClickUpAPI {
     logger.info(`Deleted task: ${taskId}`);
   }
 
-  // Comment methods for commit tracking
+  // Comment methods for tasks
   async addTaskComment(taskId: string, comment: string): Promise<void> {
     await this.client.post(`/task/${taskId}/comment`, {
       comment_text: comment,
